@@ -136,10 +136,10 @@ IF01 と IF03 で共通。「必須」の △ は条件付きで設定する項�
 | 14 | product | object | ○ | | 商品情報（No.15） |
 | 15 | product.productCd | string(10) | ○ | T_APPLICATION_VERSION.PRODUCT_CD | 現行版 |
 | 16 | amounts | object | ○ | | 金額項目（No.16-1〜16-4）。項目の名称・個数は仮 |
-| 16-1 | amounts.amount1 | number | ○ | T_APPLICATION_VERSION.AMOUNT_1 | 現行版。円。整数 |
-| 16-2 | amounts.amount2 | number | ○ | T_APPLICATION_VERSION.AMOUNT_2 | 同上。未入力は 0 |
-| 16-3 | amounts.amount3 | number | ○ | T_APPLICATION_VERSION.AMOUNT_3 | 同上。未入力は 0 |
-| 16-4 | amounts.totalAmount | number | ○ | T_APPLICATION_VERSION.TOTAL_AMOUNT | 申込金額合計（金額1〜金額3 の合計）。変更基準の判定対象 |
+| 16-1 | amounts.basicFee | number | ○ | T_APPLICATION_VERSION.BASIC_FEE | 現行版。円。整数 |
+| 16-2 | amounts.optionFee | number | ○ | T_APPLICATION_VERSION.OPTION_FEE | 同上。未入力は 0 |
+| 16-3 | amounts.handlingFee | number | ○ | T_APPLICATION_VERSION.HANDLING_FEE | 同上。未入力は 0 |
+| 16-4 | amounts.totalAmount | number | ○ | T_APPLICATION_VERSION.TOTAL_AMOUNT | 申込金額合計（基本料金・オプション料金・事務手数料 の合計）。変更基準の判定対象 |
 | 17 | contractStartDate | string(日付) | | T_APPLICATION_VERSION.CONTRACT_START_DATE | yyyy-MM-dd |
 | 18 | contractEndDate | string(日付) | | T_APPLICATION_VERSION.CONTRACT_END_DATE | yyyy-MM-dd |
 | 19 | remarks | string(1000) | | T_APPLICATION_VERSION.REMARKS | |
@@ -175,7 +175,7 @@ IF01 と IF03 で共通。「必須」の △ は条件付きで設定する項�
     "address": "東京都千代田区丸の内1-1-1"
   },
   "product": { "productCd": "PRD001" },
-  "amounts": { "amount1": 1000000, "amount2": 200000, "amount3": 0, "totalAmount": 1200000 },
+  "amounts": { "basicFee": 1000000, "optionFee": 200000, "handlingFee": 0, "totalAmount": 1200000 },
   "contractStartDate": "2026-10-01",
   "contractEndDate": "2027-09-30",
   "remarks": null,
@@ -329,14 +329,14 @@ IF02 事前確認結果も同じ構造で、result を `OK` または `NG`（rea
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 申込者番号 | 文字列 | 12 | ○ | 必須、桁、M_APPLICANT.APPLICANT_NO に存在すること | T_APPLICATION.APPLICANT_ID（申込者番号から申込者 ID に変換） |
 | 2 | 商品コード | 文字列 | 10 | ○ | 必須、桁、半角英数字（仮） | T_APPLICATION_VERSION.PRODUCT_CD |
-| 3 | 金額1 | 数値 | 13 | ○ | 必須、カンマなしの整数、0 以上、桁 | T_APPLICATION_VERSION.AMOUNT_1 |
-| 4 | 金額2 | 数値 | 13 | | カンマなしの整数、0 以上、桁。空は 0 | T_APPLICATION_VERSION.AMOUNT_2 |
-| 5 | 金額3 | 数値 | 13 | | カンマなしの整数、0 以上、桁。空は 0 | T_APPLICATION_VERSION.AMOUNT_3 |
+| 3 | 基本料金 | 数値 | 13 | ○ | 必須、カンマなしの整数、0 以上、桁 | T_APPLICATION_VERSION.BASIC_FEE |
+| 4 | オプション料金 | 数値 | 13 | | カンマなしの整数、0 以上、桁。空は 0 | T_APPLICATION_VERSION.OPTION_FEE |
+| 5 | 事務手数料 | 数値 | 13 | | カンマなしの整数、0 以上、桁。空は 0 | T_APPLICATION_VERSION.HANDLING_FEE |
 | 6 | 契約開始日 | 日付 | 10 | | yyyy-MM-dd、実在する日付 | T_APPLICATION_VERSION.CONTRACT_START_DATE |
 | 7 | 契約終了日 | 日付 | 10 | | yyyy-MM-dd、実在する日付、契約開始日 ≦ 契約終了日（両方ある場合） | T_APPLICATION_VERSION.CONTRACT_END_DATE |
 | 8 | 備考 | 文字列 | 1000 | | 桁、制御文字（改行・タブを除く）不可 | T_APPLICATION_VERSION.REMARKS |
 
-申込金額合計（TOTAL_AMOUNT）は金額1〜金額3 の合計として F01 が計算する。合計が 0 の行はエラー（E005）。金額項目の名称・個数は仮（[99. 未決事項](99-open-issues.md) No.38）。
+申込金額合計（TOTAL_AMOUNT）は基本料金・オプション料金・事務手数料 の合計として F01 が計算する。合計が 0 の行はエラー（E005）。金額項目の名称・個数はサンプル（業務確認済み。実装時に実際の項目へ差し替える）。
 
 ファイルにない項目は F01 が設定する：申込番号（採番）、担当社員・会社区分・部署（取込社員のもの）、ステータス 10100、現行版番号 1、登録区分 1（一括取込）、取込 ID、版番号 1、版種別 1、申込金額合計（計算）、確定版フラグ 0、取消フラグ 0。基準版番号・審査完了版番号は空のまま（[10. 機能詳細 2 章](10-function-detail.md#2-f01-申込一括取込)）。
 
@@ -351,9 +351,9 @@ IF02 事前確認結果も同じ構造で、result を `OK` または `NG`（rea
 | ファイル | ヘッダ行の不一致 | 「ヘッダ行が正しくありません。1 列目は「申込者番号」である必要があります。」 |
 | ファイル | 行数超過、データ行なし | 「取込できる行数は 1,000 行までです。」「取込対象の行がありません。」 |
 | 行 | 列数 | 「列数が正しくありません（8 列必要）。」 |
-| 行 | 必須（申込者番号、商品コード、金額1） | E001「申込者番号を入力してください。」 |
+| 行 | 必須（申込者番号、商品コード、基本料金） | E001「申込者番号を入力してください。」 |
 | 行 | 桁（各列） | E002「備考は1000桁以内で入力してください。」 |
-| 行 | 型・書式（金額1〜金額3、契約開始日、契約終了日） | E003「金額1の形式が正しくありません。」 |
+| 行 | 型・書式（基本料金・オプション料金・事務手数料、契約開始日、契約終了日） | E003「基本料金の形式が正しくありません。」 |
 | 行 | 相関（申込金額合計 > 0） | E005「申込金額合計は1以上の値を入力してください。」 |
 | 行 | 相関（契約開始日 ≦ 契約終了日） | E004「契約終了日は契約開始日以降の日付を入力してください。」 |
 | 行 | 業務（申込者番号の存在） | 「申込者番号 A00000000999 は申込者マスタに存在しません。」 |
@@ -363,10 +363,10 @@ IF02 事前確認結果も同じ構造で、result を `OK` または `NG`（rea
 
 ### 5.4 サンプル
 
-3 行目は正常行（備考にカンマを含む）、4 行目はエラー行（金額1の形式、契約終了日が契約開始日より前）の例。申込者番号の採番体系は仮。
+3 行目は正常行（備考にカンマを含む）、4 行目はエラー行（基本料金の形式、契約終了日が契約開始日より前）の例。申込者番号の採番体系は仮。
 
 ```csv
-申込者番号,商品コード,金額1,金額2,金額3,契約開始日,契約終了日,備考
+申込者番号,商品コード,基本料金,オプション料金,事務手数料,契約開始日,契約終了日,備考
 A00000000001,PRD001,1000000,0,0,2026-10-01,2027-09-30,
 A00000000002,PRD002,2000000,500000,,2026-10-15,,"備考に、カンマを含む例"
 A00000000003,PRD001,abc,0,0,2026-10-01,2026-09-01,エラー行の例

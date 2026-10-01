@@ -213,10 +213,10 @@ flowchart LR
 | | 会社区分／部署コード、ステータス | M_COMPANY_DIV.COMPANY_DIV_NAME／T_APPLICATION.DEPT_CD、M_STATUS.STATUS_NAME | ステータスはコード＋名称で強調表示 |
 | | 登録区分、追加申込元申込番号、取込 ID | T_APPLICATION.REGISTRATION_TYPE、SOURCE_APPLICATION_ID（元の申込の APPLICATION_NO をリンク表示）、IMPORT_BATCH_ID | 該当しない場合は「－」 |
 | | 現行版番号／基準版番号／審査完了版番号、審査完了日時／更新日時 | T_APPLICATION.CURRENT_VERSION_NO／BASE_VERSION_NO／REVIEWED_VERSION_NO、REVIEWED_AT／UPDATED_AT | 未設定は「－」 |
-| 申込内容（現行版） | 版番号／版種別／複写元版番号、商品コード、金額1〜金額3・申込金額合計、契約開始日／契約終了日、備考、確定日時、確定版フラグ | T_APPLICATION_VERSION.VERSION_NO／VERSION_TYPE／COPIED_FROM_VERSION_NO、PRODUCT_CD、AMOUNT_1〜AMOUNT_3／TOTAL_AMOUNT、CONTRACT_START_DATE／CONTRACT_END_DATE、REMARKS、CONFIRMED_AT、FIXED_FLG | 備考は改行を保持。確定版は「確定版」と表示 |
+| 申込内容（現行版） | 版番号／版種別／複写元版番号、商品コード、基本料金・オプション料金・事務手数料・申込金額合計、契約開始日／契約終了日、備考、確定日時、確定版フラグ | T_APPLICATION_VERSION.VERSION_NO／VERSION_TYPE／COPIED_FROM_VERSION_NO、PRODUCT_CD、BASIC_FEE・OPTION_FEE・HANDLING_FEE／TOTAL_AMOUNT、CONTRACT_START_DATE／CONTRACT_END_DATE、REMARKS、CONFIRMED_AT、FIXED_FLG | 備考は改行を保持。確定版は「確定版」と表示 |
 | | 変更金額倍率 | T_APPLICATION_VERSION.AMOUNT_RATIO | 設定されている版のみ表示 |
 | 差分表示 | 基準版の同項目 | T_APPLICATION_VERSION（VERSION_NO = BASE_VERSION_NO） | 基準版があり、現行版と版番号が異なるとき、現行版と並べて値が異なる項目を強調 |
-| 版履歴 | 全版の一覧 | T_APPLICATION_VERSION：VERSION_NO、VERSION_TYPE、COPIED_FROM_VERSION_NO、AMOUNT_1〜AMOUNT_3／TOTAL_AMOUNT、CONFIRMED_AT、FIXED_FLG、CANCELED_FLG | 版番号の降順。取消版は「取消」と表示し参照のみ（[99. 未決事項 No.20](99-open-issues.md)） |
+| 版履歴 | 全版の一覧 | T_APPLICATION_VERSION：VERSION_NO、VERSION_TYPE、COPIED_FROM_VERSION_NO、BASIC_FEE・OPTION_FEE・HANDLING_FEE／TOTAL_AMOUNT、CONFIRMED_AT、FIXED_FLG、CANCELED_FLG | 版番号の降順。取消版は「取消」と表示し参照のみ（[99. 未決事項 No.20](99-open-issues.md)） |
 | 承認状況 | 承認申請の一覧 | T_APPROVAL_REQUEST：VERSION_NO、APPROVAL_TYPE、ROUTE_ID（M_APPROVAL_ROUTE.ROUTE_NAME）、REQUEST_EMPLOYEE_ID（氏名）、REQUESTED_AT、REQUEST_STATUS、CURRENT_STEP_NO／FINAL_STEP_NO、COMPLETED_AT | 申請日時の降順 |
 | | 各申請の承認明細 | T_APPROVAL_STEP：STEP_NO、APPROVER_EMPLOYEE_ID（氏名）、RESULT_CD、COMMENT、ACTED_AT | 申請中の現在ステップ行を強調。差戻しコメントはここで確認する |
 | 申込者同意 | 同意の一覧 | T_APPLICANT_CONSENT：VERSION_NO、CONSENT_TYPE、CONSENT_STATUS、TOKEN_EXPIRES_AT、CONTENT_CONFIRMED_AT、CONSENTED_AT、RETURNED_AT、RETURN_REASON | トークンは表示しない。申込者の差戻し理由は RETURN_REASON |
@@ -304,10 +304,10 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | 申込者番号（M_APPLICANT.APPLICANT_NO） | 文字列 | 12 | 新規申込○ | 半角英数字、M_APPLICANT に存在すること（業務チェック。E009）。申込の作成後は変更できない（仮） |
 | 商品コード（PRODUCT_CD） | 文字列 | 10 | ○ | 半角英数字（仮。商品マスタは持たないため存在チェックなし） |
-| 金額1（AMOUNT_1） | 数値 | 13 | ○ | 整数、カンマ許容、0 以上。金額項目の名称・個数は仮（[99. 未決事項 No.38](99-open-issues.md)） |
-| 金額2（AMOUNT_2） | 数値 | 13 | | 整数、カンマ許容、0 以上。未入力は 0 |
-| 金額3（AMOUNT_3） | 数値 | 13 | | 整数、カンマ許容、0 以上。未入力は 0 |
-| 申込金額合計（TOTAL_AMOUNT） | 数値 | 13 | （自動） | 金額1〜金額3 の合計。画面側で再計算して表示し、保存時にサーバ側で計算する。0 より大きいこと（E005） |
+| 基本料金（BASIC_FEE） | 数値 | 13 | ○ | 整数、カンマ許容、0 以上。金額項目の名称・個数はサンプル（業務確認済み） |
+| オプション料金（OPTION_FEE） | 数値 | 13 | | 整数、カンマ許容、0 以上。未入力は 0 |
+| 事務手数料（HANDLING_FEE） | 数値 | 13 | | 整数、カンマ許容、0 以上。未入力は 0 |
+| 申込金額合計（TOTAL_AMOUNT） | 数値 | 13 | （自動） | 基本料金・オプション料金・事務手数料 の合計。画面側で再計算して表示し、保存時にサーバ側で計算する。0 より大きいこと（E005） |
 | 契約開始日（CONTRACT_START_DATE） | 日付 | 10 | | yyyy/MM/dd、実在する日付 |
 | 契約終了日（CONTRACT_END_DATE） | 日付 | 10 | | yyyy/MM/dd、実在する日付、契約開始日 ≦ 契約終了日（E004） |
 | 備考（REMARKS） | 文字列 | 1000 | | 改行・タブ以外の制御文字不可 |
@@ -364,7 +364,7 @@ flowchart LR
 | 区分 | 項目名 | 参照元 | 書式・備考 |
 | --- | --- | --- | --- |
 | 共通 | 申込番号、申込者名、ステータス、担当社員、承認種別 | T_APPLICATION、M_APPLICANT、M_STATUS、M_EMPLOYEE | 承認種別は名称を表示 |
-| | 申込内容（現行版）：版番号／版種別、商品コード、金額1〜金額3・申込金額合計、契約開始日／契約終了日、備考 | T_APPLICATION_VERSION | 基準版があれば差分を併記（SC03 と同じ規則） |
+| | 申込内容（現行版）：版番号／版種別、商品コード、基本料金・オプション料金・事務手数料・申込金額合計、契約開始日／契約終了日、備考 | T_APPLICATION_VERSION | 基準版があれば差分を併記（SC03 と同じ規則） |
 | 申請待ち | テンプレート名、適用開始日 | M_APPROVAL_ROUTE.ROUTE_NAME、VALID_FROM | 申込の会社区分・部署・承認種別で、適用期間に当日を含むテンプレートを検索し、適用開始日が最も新しいものを採用。該当なしは「（テンプレートなし）」 |
 | | 回付先一覧：ステップ番号、承認者氏名、部署コード | 画面内の編集状態（初期値はテンプレートの M_APPROVAL_ROUTE_STEP） | 並び順がステップ番号。最終行が最終承認者 |
 | | 承認者候補 | M_EMPLOYEE（VALID_FLG = 1、ROLE_CD = 02、COMPANY_DIV = 申込の会社区分） | 行追加時の選択肢 |
@@ -413,20 +413,20 @@ flowchart LR
 | 指摘内容、結果受信日時 | 現行版の T_EXTERNAL_LINK のうち RESULT_CD = 2（修正必要）の直近行の RESULT_REASON、RESULT_RECEIVED_AT | 10402／20402 のみ。画面上部に表示 |
 | 申込番号、ステータス、担当社員、申込者番号／申込者名 | T_APPLICATION、M_STATUS、M_EMPLOYEE、M_APPLICANT | 見出しに表示 |
 | 現行版の版番号／版種別、作成する版番号 | T_APPLICATION_VERSION.VERSION_NO／VERSION_TYPE、CURRENT_VERSION_NO + 1 | 「確定時に第 n 版を作成する」旨を表示 |
-| 基準版の各項目 | T_APPLICATION_VERSION（VERSION_NO = BASE_VERSION_NO）の商品コード、金額1〜金額3・申込金額合計、契約開始日／契約終了日、備考 | 入力欄の横に表示し、入力値と異なる項目を強調 |
+| 基準版の各項目 | T_APPLICATION_VERSION（VERSION_NO = BASE_VERSION_NO）の商品コード、基本料金・オプション料金・事務手数料・申込金額合計、契約開始日／契約終了日、備考 | 入力欄の横に表示し、入力値と異なる項目を強調 |
 | 基準版の申込金額合計、金額倍率しきい値 | 同上、M_COMPANY_DIV.AMOUNT_RATIO_LIMIT（申込の会社区分） | |
 | 変更金額倍率（参考値） | 申込金額合計 ÷ 基準版の申込金額合計 | 入力中に画面側で再計算して小数第 2 位まで表示。判定はサーバ側で行う |
 
-**入力項目**：10402／20402 では商品コード、金額1〜金額3、契約開始日、契約終了日、備考（型・桁・チェックは SC04 と同じ）。10501（一部修正）では金額1〜金額3 だけを入力でき、他の項目は表示のみ（仮、[99. 未決事項 No.40](99-open-issues.md)）。申込金額合計は自動計算。hidden：申込 ID、現行版番号、ROW_VERSION、CSRF トークン。
+**入力項目**：10402／20402 では商品コード、基本料金・オプション料金・事務手数料、契約開始日、契約終了日、備考（型・桁・チェックは SC04 と同じ）。10501（一部修正）では基本料金・オプション料金・事務手数料 だけを入力でき、他の項目は表示のみ（業務確認済み）。申込金額合計は自動計算。hidden：申込 ID、現行版番号、ROW_VERSION、CSRF トークン。
 
 **操作**
 
 | ボタン名 | 処理内容 | 遷移先 | 操作コード |
 | --- | --- | --- | --- |
-| 確定 | F10 11.3。入力チェック後、現行版の保存値と入力値の全項目を比較して変更の有無を判定する。変更あり：新しい版（版番号 = 現行版番号 + 1、版種別 2／4、複写元 = 現行版、確定日時、申込金額合計 = 金額1〜金額3 の合計、変更金額倍率 = 申込金額合計 ÷ 基準版の申込金額合計（小数第 4 位切り捨て）、確定版フラグ 0）を登録し、現行版番号を更新して F14 を操作コード 02 で呼ぶ。変更なし：10501 は E104、10402／20402 は版を作らず F14 を操作コード 02 で呼ぶ（変更基準内として扱う、仮） | SC03（I005。基準超のときは W001 も表示） | 02 |
+| 確定 | F10 11.3。入力チェック後、現行版の保存値と入力値の全項目を比較して変更の有無を判定する。変更あり：新しい版（版番号 = 現行版番号 + 1、版種別 2／4、複写元 = 現行版、確定日時、申込金額合計 = 基本料金・オプション料金・事務手数料 の合計、変更金額倍率 = 申込金額合計 ÷ 基準版の申込金額合計（小数第 4 位切り捨て）、確定版フラグ 0）を登録し、現行版番号を更新して F14 を操作コード 02 で呼ぶ。変更なし：10501 は E104、10402／20402 は版を作らず F14 を操作コード 02 で呼ぶ（変更基準内として扱う、仮） | SC03（I005。基準超のときは W001 も表示） | 02 |
 | 戻る | 保存せずに SC03 へ戻る。入力を変更している場合は確認ダイアログを出す（仮） | SC03 | なし |
 
-**備考**：変更金額倍率がしきい値を超える場合は、画面側の参考表示でも W001 を表示する。確定版を直接変更しないため一時保存はない。申込内容全体を作り直す場合は SC03 の「全体修正」（10402／10501）で入力中へ戻す。変更基準超で一次承認申請待ちへ戻った場合は、一次承認と申込者確認からやり直し、申込者が再び同意した時点で基準版が更新される。
+**備考**：変更金額倍率がしきい値以上の場合は、画面側の参考表示でも W001 を表示する。減額は常に基準内。確定版を直接変更しないため一時保存はない。申込内容全体を作り直す場合は SC03 の「全体修正」（10402／10501）で入力中へ戻す。変更基準超で一次承認申請待ちへ戻った場合は、一次承認と申込者確認からやり直し、申込者が再び同意した時点で基準版が更新される。
 
 ### 4.8 SC08 契約変更入力
 
@@ -438,7 +438,7 @@ flowchart LR
 
 **表示項目**：申込番号・ステータス・担当社員・申込者番号／申込者名（見出し）、版番号／版種別／複写元版番号（複写元 = 審査完了版）、変更前（審査完了版 = REVIEWED_VERSION_NO）の各項目（入力欄の横に表示し、入力値と異なる項目を強調。契約変更中は基準版 = 審査完了版）、基準版の申込金額・金額倍率しきい値（M_COMPANY_DIV.AMOUNT_RATIO_LIMIT）・変更金額倍率（参考値。SC07 と同じ。基準超なら W001 を参考表示）。
 
-**入力項目**：商品コード、金額1〜金額3・申込金額合計、契約開始日、契約終了日、備考（SC04 と同じ）。hidden：申込 ID、版番号、ROW_VERSION、CSRF トークン。
+**入力項目**：商品コード、基本料金・オプション料金・事務手数料・申込金額合計、契約開始日、契約終了日、備考（SC04 と同じ）。hidden：申込 ID、版番号、ROW_VERSION、CSRF トークン。
 
 **操作**
 
@@ -463,7 +463,7 @@ flowchart LR
 | 項目名 | 参照元 | 書式・備考 |
 | --- | --- | --- |
 | 申込番号、ステータス、担当社員、申込者番号／申込者名、会社区分 | T_APPLICATION、M_STATUS、M_EMPLOYEE、M_APPLICANT、M_COMPANY_DIV | |
-| 変更前／変更後の各項目 | 審査完了版（REVIEWED_VERSION_NO）と現行版の商品コード、金額1〜金額3・申込金額合計、契約開始日／契約終了日、備考 | 並べて表示し、異なる項目を強調 |
+| 変更前／変更後の各項目 | 審査完了版（REVIEWED_VERSION_NO）と現行版の商品コード、基本料金・オプション料金・事務手数料・申込金額合計、契約開始日／契約終了日、備考 | 並べて表示し、異なる項目を強調 |
 | 変更金額倍率、金額倍率しきい値 | 現行版の申込金額合計 ÷ 基準版の申込金額合計、M_COMPANY_DIV.AMOUNT_RATIO_LIMIT | 小数第 2 位まで |
 | 判定結果と確定後の遷移先 | 変更基準超：20201（一次承認・申込者確認を経る）。変更基準内：会社区分 1 は 20501、会社区分 2 は 20401（事前確認依頼を登録） | 基準超のときは W001 を表示 |
 
@@ -566,7 +566,7 @@ flowchart LR
 | --- | --- | --- |
 | 申込番号、申込者名 | T_APPLICATION.APPLICATION_NO、M_APPLICANT.APPLICANT_NAME | |
 | 手続きの状況 | M_STATUS.APPLICANT_STATUS_NAME（「内容確認中」） | 申込受付会社向けのステータス名・コードは表示しない |
-| 商品コード、金額1〜金額3・申込金額合計、契約期間、備考 | T_APPLICATION_VERSION.PRODUCT_CD、AMOUNT_1〜AMOUNT_3／TOTAL_AMOUNT、CONTRACT_START_DATE 〜 CONTRACT_END_DATE、REMARKS（現行版） | 金額は 3 桁カンマ、円。契約期間は yyyy/MM/dd、空は「－」 |
+| 商品コード、基本料金・オプション料金・事務手数料・申込金額合計、契約期間、備考 | T_APPLICATION_VERSION.PRODUCT_CD、BASIC_FEE・OPTION_FEE・HANDLING_FEE／TOTAL_AMOUNT、CONTRACT_START_DATE 〜 CONTRACT_END_DATE、REMARKS（現行版） | 金額は 3 桁カンマ、円。契約期間は yyyy/MM/dd、空は「－」 |
 | 変更前の内容 | 審査完了版（REVIEWED_VERSION_NO）の同項目 | CONSENT_TYPE = 2（契約変更）のときだけ、変更前・変更後を並べて表示し、異なる項目を強調 |
 | 確認期限 | T_APPLICANT_CONSENT.TOKEN_EXPIRES_AT | yyyy/MM/dd HH:mm |
 
@@ -594,7 +594,7 @@ flowchart LR
 
 **表示項目**：申込番号（APPLICATION_NO）、申込者名（APPLICANT_NAME）、手続きの状況（APPLICANT_STATUS_NAME）、確認期限（TOKEN_EXPIRES_AT）。
 
-**入力項目**：商品コード、金額1〜金額3・申込金額合計、契約開始日、契約終了日、備考（型・桁・チェックは SC04 と同じ。申込金額合計 > 0 は E005、契約開始日 ≦ 契約終了日は E004）。hidden：CSRF トークン。
+**入力項目**：商品コード、基本料金・オプション料金・事務手数料・申込金額合計、契約開始日、契約終了日、備考（型・桁・チェックは SC04 と同じ。申込金額合計 > 0 は E005、契約開始日 ≦ 契約終了日は E004）。hidden：CSRF トークン。
 
 **操作**：「保存」でトークン検証後、ステータスが 10301 であることを確認し、入力チェックを行って現行版を更新する（版は増えない。ステータス遷移なし、履歴なし）。AP01 へリダイレクトして I001 を表示する。「戻る」で保存せずに AP01 へ戻る。操作コードはない。
 
