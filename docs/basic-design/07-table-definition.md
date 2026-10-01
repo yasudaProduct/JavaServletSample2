@@ -63,10 +63,10 @@
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
-| 会社区分 | COMPANY_DIV | 固定長(1) | ○ | PK | 1：事前確認なし、2：事前確認あり |
+| 会社区分 | COMPANY_DIV | 固定長(1) | ○ | PK | 1：会社A（事前確認なし）、2：会社B（事前確認あり） |
 | 会社区分名 | COMPANY_DIV_NAME | 文字列(50) | ○ | | |
 | 外部事前確認フラグ | PRE_CHECK_FLG | 固定長(1) | ○ | | 1：あり、0：なし |
-| 金額倍率しきい値 | AMOUNT_RATIO_LIMIT | 数値(3,2) | ○ | | 既定値 1.50。これを超えると変更基準超 |
+| 金額倍率しきい値 | AMOUNT_RATIO_LIMIT | 数値(3,2) | ○ | | 既定値 1.50（仮）。申込金額合計の基準版に対する倍率がこれを超えると変更基準超 |
 
 ### 4.2 社員マスタ（M_EMPLOYEE）
 
@@ -203,11 +203,13 @@
 | 版種別 | VERSION_TYPE | 固定長(1) | ○ | | 1：新規申込、2：新規申込の修正、3：契約変更、4：契約変更の修正 |
 | 複写元版番号 | COPIED_FROM_VERSION_NO | 数値(3) | | | 複写して作った版の複写元。第 1 版は空 |
 | 商品コード | PRODUCT_CD | 文字列(10) | ○ | | |
-| 申込金額 | APPLICATION_AMOUNT | 数値(13) | ○ | | 円 |
+| 金額1 | AMOUNT_1 | 数値(13) | ○ | | 円。金額項目の名称・個数は仮（[99. 未決事項](99-open-issues.md) No.38） |
+| 金額2 | AMOUNT_2 | 数値(13) | ○ | | 円。未入力は 0 |
+| 金額3 | AMOUNT_3 | 数値(13) | ○ | | 円。未入力は 0 |
+| 申込金額合計 | TOTAL_AMOUNT | 数値(13) | ○ | | 金額1〜金額3 の合計。保存時に計算して保持する。変更基準の判定対象 |
 | 契約開始日 | CONTRACT_START_DATE | 日付 | | | |
 | 契約終了日 | CONTRACT_END_DATE | 日付 | | | |
-| 変更金額倍率 | AMOUNT_RATIO | 数値(7,4) | | | 申込金額 ÷ 基準版の申込金額。変更基準を判定した版に設定 |
-| その他修正フラグ | OTHER_MODIFIED_FLG | 固定長(1) | ○ | | 基準版と比べて金額以外の項目を変更した版は 1 |
+| 変更金額倍率 | AMOUNT_RATIO | 数値(7,4) | | | 申込金額合計 ÷ 基準版の申込金額合計。変更基準を判定した版に設定 |
 | 備考 | REMARKS | 文字列(1000) | | | |
 | 確定日時 | CONFIRMED_AT | 日時 | | | 担当者または申込者が確定した日時。再確定で上書き |
 | 確定版フラグ | FIXED_FLG | 固定長(1) | ○ | | 1：申込者が同意した版または審査完了した版。以降は変更しない |
@@ -333,6 +335,7 @@
 | M_COMPANY_DIV | 区分値の意味を 1 = 事前確認なし、2 = 事前確認あり に変更 | 業務側の遷移表に合わせる |
 | T_APPLICATION | BASE_AMOUNT を BASE_VERSION_NO（基準版番号）に変更。REGISTRATION_TYPE、SOURCE_APPLICATION_ID を追加 | 変更基準の比較元を版で持つ。画面からの新規申込・追加申込に対応 |
 | T_APPLICATION_VERSION | COPIED_FROM_VERSION_NO、FIXED_FLG、CANCELED_FLG を追加。版種別の意味を変更 | 確定版の保護、契約変更の審査差戻しによる取消 |
+| T_APPLICATION_VERSION | APPLICATION_AMOUNT を金額項目（AMOUNT_1〜AMOUNT_3）と申込金額合計（TOTAL_AMOUNT）に分割。OTHER_MODIFIED_FLG を削除 | 変更基準を金額項目の合計の倍率だけで判定する（業務確認済み） |
 | T_APPROVAL_REQUEST | REQUEST_STATUS から 4（引戻し）を削除。ROUTE_ID をテンプレートの参照に変更 | 申請中の引戻しは遷移表にない。回付先は申請時に設定する |
 | T_APPROVAL_STEP | RESULT_CD に 3（審査申請）を追加 | 最終承認者の操作が審査申請になる |
 | T_EXTERNAL_LINK | NG_REASON を RESULT_REASON に変更。RESULT_CD に 4（審査差戻し）を追加 | 審査差戻しに対応 |

@@ -135,19 +135,22 @@ IF01 と IF03 で共通。「必須」の △ は条件付きで設定する項�
 | 13 | applicant.address | string(200) | | M_APPLICANT.ADDRESS | |
 | 14 | product | object | ○ | | 商品情報（No.15） |
 | 15 | product.productCd | string(10) | ○ | T_APPLICATION_VERSION.PRODUCT_CD | 現行版 |
-| 16 | applicationAmount | number | ○ | T_APPLICATION_VERSION.APPLICATION_AMOUNT | 現行版。円。整数 |
+| 16 | amounts | object | ○ | | 金額項目（No.16-1〜16-4）。項目の名称・個数は仮 |
+| 16-1 | amounts.amount1 | number | ○ | T_APPLICATION_VERSION.AMOUNT_1 | 現行版。円。整数 |
+| 16-2 | amounts.amount2 | number | ○ | T_APPLICATION_VERSION.AMOUNT_2 | 同上。未入力は 0 |
+| 16-3 | amounts.amount3 | number | ○ | T_APPLICATION_VERSION.AMOUNT_3 | 同上。未入力は 0 |
+| 16-4 | amounts.totalAmount | number | ○ | T_APPLICATION_VERSION.TOTAL_AMOUNT | 申込金額合計（金額1〜金額3 の合計）。変更基準の判定対象 |
 | 17 | contractStartDate | string(日付) | | T_APPLICATION_VERSION.CONTRACT_START_DATE | yyyy-MM-dd |
 | 18 | contractEndDate | string(日付) | | T_APPLICATION_VERSION.CONTRACT_END_DATE | yyyy-MM-dd |
 | 19 | remarks | string(1000) | | T_APPLICATION_VERSION.REMARKS | |
 | 20 | baseVersion | object | IF01 ○／IF03 △ | T_APPLICATION_VERSION（IF01：T_APPLICATION.BASE_VERSION_NO の版、IF03：T_APPLICATION.REVIEWED_VERSION_NO の版） | 比較元の版（No.21〜26）。IF01 は基準版を常に設定する。IF03 は契約変更審査依頼（LINK_TYPE 4）のとき審査完了版（契約変更前の内容）を設定し、審査依頼（LINK_TYPE 2）では省略する |
 | 21 | baseVersion.versionNo | number | △ | 同上.VERSION_NO | |
 | 22 | baseVersion.productCd | string(10) | △ | 同上.PRODUCT_CD | |
-| 23 | baseVersion.applicationAmount | number | △ | 同上.APPLICATION_AMOUNT | |
+| 23 | baseVersion.totalAmount | number | △ | 同上.TOTAL_AMOUNT | 基準版の申込金額合計 |
 | 24 | baseVersion.contractStartDate | string(日付) | | 同上.CONTRACT_START_DATE | |
 | 25 | baseVersion.contractEndDate | string(日付) | | 同上.CONTRACT_END_DATE | |
 | 26 | baseVersion.remarks | string(1000) | | 同上.REMARKS | |
-| 27 | amountRatio | number | IF01 ○ | T_APPLICATION_VERSION.AMOUNT_RATIO | 現行版の変更金額倍率（申込金額 ÷ 基準版の申込金額）。同意直後の依頼（遷移 ID 15、43）は現行版が基準版そのもののため 1.0 を設定する。IF03 は現行版に値があれば送る（任意） |
-| 28 | otherModifiedFlg | string(1) | ○ | T_APPLICATION_VERSION.OTHER_MODIFIED_FLG | 現行版の値。1：基準版と比べて金額以外の項目を変更した版 |
+| 27 | amountRatio | number | IF01 ○ | T_APPLICATION_VERSION.AMOUNT_RATIO | 現行版の変更金額倍率（申込金額合計 ÷ 基準版の申込金額合計）。同意直後の依頼（遷移 ID 15、43）は現行版が基準版そのもののため 1.0 を設定する。IF03 は現行版に値があれば送る（任意） |
 | 29 | contractChangeCount | number | ○ | （T_APPLICATION.REVIEWED_VERSION_NO の版の VERSION_TYPE から算出） | 契約変更の回数（仮）。新規申込の依頼（LINK_TYPE 1／2）は 0。契約変更の依頼（LINK_TYPE 3／4）は、審査完了版の版種別が 1（新規申込）なら 1（初回の契約変更）、3（契約変更）なら 2（2 回目以降。正確な回数は表さない）。条件コード 41／42 と同じ判定 |
 | 30 | requestedAt | string(日時) | ○ | （送信時の現在日時） | ISO 8601 |
 
@@ -172,20 +175,19 @@ IF01 と IF03 で共通。「必須」の △ は条件付きで設定する項�
     "address": "東京都千代田区丸の内1-1-1"
   },
   "product": { "productCd": "PRD001" },
-  "applicationAmount": 1200000,
+  "amounts": { "amount1": 1000000, "amount2": 200000, "amount3": 0, "totalAmount": 1200000 },
   "contractStartDate": "2026-10-01",
   "contractEndDate": "2027-09-30",
   "remarks": null,
   "baseVersion": {
     "versionNo": 1,
     "productCd": "PRD001",
-    "applicationAmount": 1000000,
+    "totalAmount": 1000000,
     "contractStartDate": "2026-10-01",
     "contractEndDate": "2027-09-30",
     "remarks": null
   },
   "amountRatio": 1.2,
-  "otherModifiedFlg": "0",
   "contractChangeCount": 0,
   "requestedAt": "2026-09-30T10:15:30+09:00"
 }
@@ -327,12 +329,16 @@ IF02 事前確認結果も同じ構造で、result を `OK` または `NG`（rea
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 申込者番号 | 文字列 | 12 | ○ | 必須、桁、M_APPLICANT.APPLICANT_NO に存在すること | T_APPLICATION.APPLICANT_ID（申込者番号から申込者 ID に変換） |
 | 2 | 商品コード | 文字列 | 10 | ○ | 必須、桁、半角英数字（仮） | T_APPLICATION_VERSION.PRODUCT_CD |
-| 3 | 申込金額 | 数値 | 13 | ○ | 必須、カンマなしの整数、1 以上、桁 | T_APPLICATION_VERSION.APPLICATION_AMOUNT |
-| 4 | 契約開始日 | 日付 | 10 | | yyyy-MM-dd、実在する日付 | T_APPLICATION_VERSION.CONTRACT_START_DATE |
-| 5 | 契約終了日 | 日付 | 10 | | yyyy-MM-dd、実在する日付、契約開始日 ≦ 契約終了日（両方ある場合） | T_APPLICATION_VERSION.CONTRACT_END_DATE |
-| 6 | 備考 | 文字列 | 1000 | | 桁、制御文字（改行・タブを除く）不可 | T_APPLICATION_VERSION.REMARKS |
+| 3 | 金額1 | 数値 | 13 | ○ | 必須、カンマなしの整数、0 以上、桁 | T_APPLICATION_VERSION.AMOUNT_1 |
+| 4 | 金額2 | 数値 | 13 | | カンマなしの整数、0 以上、桁。空は 0 | T_APPLICATION_VERSION.AMOUNT_2 |
+| 5 | 金額3 | 数値 | 13 | | カンマなしの整数、0 以上、桁。空は 0 | T_APPLICATION_VERSION.AMOUNT_3 |
+| 6 | 契約開始日 | 日付 | 10 | | yyyy-MM-dd、実在する日付 | T_APPLICATION_VERSION.CONTRACT_START_DATE |
+| 7 | 契約終了日 | 日付 | 10 | | yyyy-MM-dd、実在する日付、契約開始日 ≦ 契約終了日（両方ある場合） | T_APPLICATION_VERSION.CONTRACT_END_DATE |
+| 8 | 備考 | 文字列 | 1000 | | 桁、制御文字（改行・タブを除く）不可 | T_APPLICATION_VERSION.REMARKS |
 
-ファイルにない項目は F01 が設定する：申込番号（採番）、担当社員・会社区分・部署（取込社員のもの）、ステータス 10100、現行版番号 1、登録区分 1（一括取込）、取込 ID、版番号 1、版種別 1、その他修正フラグ 0、確定版フラグ 0、取消フラグ 0。基準版番号・審査完了版番号は空のまま（[10. 機能詳細 2 章](10-function-detail.md#2-f01-申込一括取込)）。
+申込金額合計（TOTAL_AMOUNT）は金額1〜金額3 の合計として F01 が計算する。合計が 0 の行はエラー（E005）。金額項目の名称・個数は仮（[99. 未決事項](99-open-issues.md) No.38）。
+
+ファイルにない項目は F01 が設定する：申込番号（採番）、担当社員・会社区分・部署（取込社員のもの）、ステータス 10100、現行版番号 1、登録区分 1（一括取込）、取込 ID、版番号 1、版種別 1、申込金額合計（計算）、確定版フラグ 0、取消フラグ 0。基準版番号・審査完了版番号は空のまま（[10. 機能詳細 2 章](10-function-detail.md#2-f01-申込一括取込)）。
 
 ### 5.3 チェックとエラーメッセージ
 
@@ -344,10 +350,11 @@ IF02 事前確認結果も同じ構造で、result を `OK` または `NG`（rea
 | ファイル | 拡張子・サイズ・文字コード | E008「ファイルの形式またはサイズが正しくありません。」 |
 | ファイル | ヘッダ行の不一致 | 「ヘッダ行が正しくありません。1 列目は「申込者番号」である必要があります。」 |
 | ファイル | 行数超過、データ行なし | 「取込できる行数は 1,000 行までです。」「取込対象の行がありません。」 |
-| 行 | 列数 | 「列数が正しくありません（6 列必要）。」 |
-| 行 | 必須（申込者番号、商品コード、申込金額） | E001「申込者番号を入力してください。」 |
+| 行 | 列数 | 「列数が正しくありません（8 列必要）。」 |
+| 行 | 必須（申込者番号、商品コード、金額1） | E001「申込者番号を入力してください。」 |
 | 行 | 桁（各列） | E002「備考は1000桁以内で入力してください。」 |
-| 行 | 型・書式（申込金額、契約開始日、契約終了日） | E003「申込金額の形式が正しくありません。」 |
+| 行 | 型・書式（金額1〜金額3、契約開始日、契約終了日） | E003「金額1の形式が正しくありません。」 |
+| 行 | 相関（申込金額合計 > 0） | E005「申込金額合計は1以上の値を入力してください。」 |
 | 行 | 相関（契約開始日 ≦ 契約終了日） | E004「契約終了日は契約開始日以降の日付を入力してください。」 |
 | 行 | 業務（申込者番号の存在） | 「申込者番号 A00000000999 は申込者マスタに存在しません。」 |
 
@@ -356,13 +363,13 @@ IF02 事前確認結果も同じ構造で、result を `OK` または `NG`（rea
 
 ### 5.4 サンプル
 
-3 行目は正常行（備考にカンマを含む）、4 行目はエラー行（申込金額の形式、契約終了日が契約開始日より前）の例。申込者番号の採番体系は仮。
+3 行目は正常行（備考にカンマを含む）、4 行目はエラー行（金額1の形式、契約終了日が契約開始日より前）の例。申込者番号の採番体系は仮。
 
 ```csv
-申込者番号,商品コード,申込金額,契約開始日,契約終了日,備考
-A00000000001,PRD001,1000000,2026-10-01,2027-09-30,
-A00000000002,PRD002,2500000,2026-10-15,,"備考に、カンマを含む例"
-A00000000003,PRD001,abc,2026-10-01,2026-09-01,エラー行の例
+申込者番号,商品コード,金額1,金額2,金額3,契約開始日,契約終了日,備考
+A00000000001,PRD001,1000000,0,0,2026-10-01,2027-09-30,
+A00000000002,PRD002,2000000,500000,,2026-10-15,,"備考に、カンマを含む例"
+A00000000003,PRD001,abc,0,0,2026-10-01,2026-09-01,エラー行の例
 ```
 
 ## 6. シーケンス図
