@@ -1,0 +1,77 @@
+# ======================================================================
+# 申込管理システム 開発環境
+#   db      : SQL Server 2019（開発用。データは volume に保持）
+#   db-init : データベース appmgmt とログインの作成（1 回だけ実行）
+#   app     : Tomcat 9 + 本アプリ（起動時に Flyway でテーブルと初期データを作成）
+#   mail    : Mailpit（通知メールの確認用 SMTP サーバ。http://localhost:8025）
+# 起動: docker compose up --build   → http://localhost:8080/emp/login
+# ======================================================================
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-SaPassw0rd!2026}
+      MSSQL_PID: Developer
+      MSSQL_COLLATION: Japanese_CI_AS
+      TZ: Asia/Tokyo
+    ports:
+      - "${DB_PORT:-1433}:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "( /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' ) > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-SaPassw0rd!2026}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-Appmgmt#2026}
+    volumes:
+      - ./docker/db:/docker:ro
+    entrypoint: ["/bin/bash", "/docker/init.sh"]
+
+  mail:
+    image: axllent/mailpit:latest
+    ports:
+      - "${MAIL_UI_PORT:-8025}:8025"
+      - "1025:1025"
+    environment:
+      TZ: Asia/Tokyo
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      mail:
+        condition: service_started
+    environment:
+      TZ: Asia/Tokyo
+      DB_URL: jdbc:sqlserver://db:1433;databaseName=appmgmt;encrypt=true;trustServerCertificate=true
+      DB_USER: appmgmt
+      DB_PASSWORD: ${APP_DB_PASSWORD:-Appmgmt#2026}
+      APP_APPLICANT_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      APP_EMPLOYEE_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      APP_DEV_TOOLS_ENABLED: "true"
+      MAIL_MODE: smtp
+      MAIL_SMTP_HOST: mail
+      MAIL_SMTP_PORT: "1025"
+      EXTAPI_MODE: mock
+      BATCH_INITIAL_DELAY_SECONDS: "10"
+      BATCH_NOTIFICATION_INTERVAL_SECONDS: "15"
+      BATCH_EXTERNAL_INTERVAL_SECONDS: "15"
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+volumes:
+  mssql-data:

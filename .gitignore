@@ -21,3 +21,12 @@ Thumbs.db
 *.log
 *.tmp
 *.bkp
+
+# 環境ごとの設定
+.env
+
+# Playwright / 動作確認の出力
+node_modules/
+playwright-report/
+test-results/
+e2e/shots/

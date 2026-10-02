@@ -151,7 +151,7 @@ IF01 と IF03 で共通。「必須」の △ は条件付きで設定する項�
 | 25 | baseVersion.contractEndDate | string(日付) | | 同上.CONTRACT_END_DATE | |
 | 26 | baseVersion.remarks | string(1000) | | 同上.REMARKS | |
 | 27 | amountRatio | number | IF01 ○ | T_APPLICATION_VERSION.AMOUNT_RATIO | 現行版の変更金額倍率（申込金額合計 ÷ 基準版の申込金額合計）。同意直後の依頼（遷移 ID 15、43）は現行版が基準版そのもののため 1.0 を設定する。IF03 は現行版に値があれば送る（任意） |
-| 29 | contractChangeCount | number | ○ | （T_APPLICATION.REVIEWED_VERSION_NO の版の VERSION_TYPE から算出） | 契約変更の回数（仮）。新規申込の依頼（LINK_TYPE 1／2）は 0。契約変更の依頼（LINK_TYPE 3／4）は、審査完了版の版種別が 1（新規申込）なら 1（初回の契約変更）、3（契約変更）なら 2（2 回目以降。正確な回数は表さない）。条件コード 41／42 と同じ判定 |
+| 29 | contractChangeCount | number | ○ | （T_APPLICATION.REVIEWED_VERSION_NO の版の VERSION_TYPE から算出） | 契約変更の回数（仮）。新規申込の依頼（LINK_TYPE 1／2）は 0。契約変更の依頼（LINK_TYPE 3／4）は、審査完了版の版種別が 1／2（新規申込系）なら 1（初回の契約変更）、3／4（契約変更系）なら 2（2 回目以降。正確な回数は表さない）。条件コード 41／42 と同じ判定 |
 | 30 | requestedAt | string(日時) | ○ | （送信時の現在日時） | ISO 8601 |
 
 ### 3.3 電文例（IF01 事前確認依頼：修正対応後の再依頼）

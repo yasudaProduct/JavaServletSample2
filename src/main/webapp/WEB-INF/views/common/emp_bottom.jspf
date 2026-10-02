@@ -1,0 +1,7 @@
+</main>
+<footer class="text-muted small text-center py-3 border-top">申込管理システム（サンプル実装） v${applicationScope.appVersion}</footer>
+<script src="${ctx}/static/vendor/jquery.slim.min.js"></script>
+<script src="${ctx}/static/vendor/bootstrap.bundle.min.js"></script>
+<script src="${ctx}/static/js/app.js"></script>
+</body>
+</html>

@@ -4,28 +4,142 @@
 
 ## 現在の状態
 
-基本設計を作成中（設計ドキュメントのドラフト版）。実装は基本設計の確定後に着手する。
+- 基本設計：版 0.3（[docs/README.md](docs/README.md)）。業務ルールの未決事項は [99. 未決事項](docs/basic-design/99-open-issues.md) で管理している。
+- 実装：動作確認用のサンプル実装（版 0.1.0）。設計書の全画面（SC01〜SC13、AP01〜AP05）、外部 IF（IF01〜IF05）、バッチ（BT01／BT02）を実装し、Docker Compose で起動できる。要件は変わる可能性があるため、業務ルールは設計書を正とし、実装はそれに追従させる。
+
+## 技術スタック（確定）
+
+| 分類 | 採用 |
+| --- | --- |
+| 言語・Web | Java 17、Servlet 4.0／JSP 2.3／JSTL 1.2（`javax.*`） |
+| AP サーバ | Apache Tomcat 9.0 |
+| DB | Microsoft SQL Server 2019（スキーマと初期データは起動時に Flyway で適用） |
+| 画面 | Bootstrap 4.6（`src/main/webapp/static/vendor` に同梱）、jQuery 3.7 slim |
+| ビルド | Maven（WAR パッケージ） |
+| 開発環境 | Docker Compose（SQL Server 2019 ＋ Tomcat 9 ＋ Mailpit） |
+
+## クイックスタート（Docker）
+
+Docker Desktop または Docker Engine（compose v2）が必要。
+
+```bash
+docker compose up --build
+```
+
+初回は SQL Server の起動とデータベース作成（`db-init`）、WAR のビルドに数分かかる。`app` のログに「初期化が完了しました」と出たら利用できる。
+
+| URL | 内容 |
+| --- | --- |
+| http://localhost:8080/emp/login | 申込受付会社向け画面（ログイン） |
+| http://localhost:8025 | Mailpit（送信された通知メールの確認。確認用 URL もここで見られる） |
+| `localhost:1433` | SQL Server（`sa` ／ `SaPassw0rd!2026`、データベース `appmgmt`） |
+
+ポートやパスワードを変える場合は `.env.example` を `.env` にコピーして編集する。データは Docker volume `mssql-data` に残る。初期化し直す場合は `docker compose down -v`。
+
+### サンプルの社員（パスワードはすべて `password`）
+
+| 社員番号 | 氏名 | 会社区分 | 部署 | 権限 |
+| --- | --- | --- | --- | --- |
+| A001 | 会社A 担当 太郎 | 会社A（事前確認なし） | 100 | 担当者 |
+| A002 | 会社A 承認 一郎 | 会社A | 100 | 承認者 |
+| A003 | 会社A 承認 二郎 | 会社A | 100 | 承認者 |
+| A009 | 会社A 管理 花子 | 会社A | 900 | 管理者 |
+| B001 | 会社B 担当 次郎 | 会社B（事前確認あり） | 200 | 担当者 |
+| B002 | 会社B 承認 三郎 | 会社B | 200 | 承認者 |
+| B003 | 会社B 承認 四郎 | 会社B | 200 | 承認者 |
+
+申込者マスタには C0000000001〜C0000000005 の 5 名、承認ルートマスタには会社ごとに一次承認（承認者 1 名）と最終承認（承認者 2 名）のテンプレートが入っている。
+
+### 動きを確認する手順（新規申込〜審査完了〜契約変更）
+
+1. **A001** でログインし、「新規申込」から申込者番号 `C0000000001` と金額を入力して「確認へ」→「確定」（10201 一次承認申請待ち）。
+2. 申込詳細の「申請（承認フロー）」で回付先（テンプレートの初期値は A002）を確認して「申請」（10202）。
+3. **A002** でログインし、一覧の「自分の操作待ち」から申込を開いて「承認フローへ」→「承認」（10301 申込内容確認待ち。申込者宛の確認依頼が通知に積まれる）。
+4. 確認用 URL を開く。メニュー「開発支援 → 通知一覧」の「申込者向け画面を開く」か、Mailpit のメールのリンクから。申込者として「確定」→「同意する」（会社A は 10501 最終承認申請待ち、会社B は 10401 事前確認待ち）。
+5. **A001** で「申請（承認フロー）」（最終承認：A002 → A003）。**A002** が「承認」、**A003** が「審査申請」（10601 審査中。審査依頼が外部連携に積まれ、BT02 がモックへ送る）。
+6. メニュー「開発支援 → 審査担当部門システム（モック）」で「BT02 を今すぐ実行」し、結果待ちの依頼に「COMPLETED（審査完了）」を返す（10701 審査完了）。
+7. **A001** で「契約変更手続き」→ 金額を変更して「確認へ」→「確定」。基準版の 1.5 倍以上なら 20201（一次承認からやり直し）、未満なら 20501（会社A）／20401（会社B）へ進む。以降は新規申込と同じ流れ。
+
+会社B（B001）で同じ操作をすると、同意後に事前確認待ち（10401）になり、モックで「NG（修正必要）」を返すと修正対応待ち（10402）→「修正対応」で再依頼、という事前確認の流れを確認できる。一括取込は「一括取込」メニューに表示されるサンプル CSV を使う。
+
+### 外部 IF を直接呼ぶ
+
+審査結果の受信 IF（IF02／IF04）は HTTP でも呼べる。受付番号と依頼 ID はモック画面または申込詳細の外部連携に表示される。
+
+```bash
+curl -X POST http://localhost:8080/api/external/review-result \
+  -H "Content-Type: application/json" \
+  -d '{"externalReceiptNo":"MOCK-20261002181000-5","requestId":5,"result":"COMPLETED","resultAt":"2026-10-02T18:30:00+09:00"}'
+```
+
+`EXTAPI_INBOUND_API_KEY` を設定すると `X-API-Key` ヘッダの検証を行う（既定は検証なし）。
+
+## Docker なしで起動する（組込み Tomcat ＋ H2）
+
+JDK 17 以上と Maven があれば、SQL Server の代わりに H2 インメモリ DB（SQL Server 互換モード）で起動できる。DB は JVM 終了で消える。
+
+```bash
+mvn -Plocal            # http://localhost:8080/emp/login
+mvn -Plocal -Dlocal.port=9090
+```
+
+メールはログ出力のみ（`mail.mode=log`）、審査担当部門システムはモック。確認用 URL は「開発支援 → 通知一覧」から開く。
+
+## 設定
+
+`src/main/resources/application.properties` の値を環境変数（`db.url` → `DB_URL` のようにドットとハイフンをアンダースコア、大文字にしたもの）またはシステムプロパティで上書きする。主なキー：
+
+| キー | 既定値 | 内容 |
+| --- | --- | --- |
+| `db.url`／`db.user`／`db.password` | SQL Server（localhost） | JDBC 接続情報 |
+| `app.applicant-base-url`／`app.employee-base-url` | http://localhost:8080 | 確認用 URL と申込詳細 URL のベース |
+| `app.dev-tools.enabled` | true | 開発支援画面（通知一覧、審査担当部門システムモック、バッチ即時実行）の有効化。本番は false |
+| `mail.mode` | log | `log`（送信せずログ）／`smtp`（SMTP 送信。`mail.smtp.*`） |
+| `extapi.mode` | mock | `mock`（送信せず受付番号を採番）／`http`（`extapi.base-url` へ送信） |
+| `extapi.inbound.api-key`／`extapi.inbound.allowed-ips` | （なし） | IF02／IF04 受信の API キーと接続元 IP 制限 |
+| `batch.enabled`、`batch.*.interval-seconds` | true、15〜60 | WAR 内スケジューラの有効化と周期（[13. バッチ・通知設計](docs/basic-design/13-batch-notification.md) 2.5 節） |
+
+## ビルドとテスト
+
+```bash
+mvn package            # 単体テストを実行して target/appmgmt.war を作る
+mvn test               # 単体テストのみ（遷移条件、入力チェック、CSV、書式）
+```
+
+画面を通した確認は `e2e/flow.js`（Playwright）で行える。`npm install playwright && npx playwright install chromium` の後、アプリを起動した状態で `node e2e/flow.js` を実行すると、新規申込〜契約変更〜会社B の事前確認〜一括取込を一通り操作し、`e2e/shots/` にスクリーンショットを保存する。
 
 ## リポジトリ構成
 
 ```text
 .
-├── README.md                 このファイル
-├── docs/
-│   ├── README.md             設計ドキュメントの一覧と読み方
-│   ├── basic-design/         基本設計書（Markdown）
-│   └── diagrams/             draw.io の図（原本）と PNG エクスポート
-└── src/                      ソースコード（実装フェーズで追加）
+├── README.md                     このファイル
+├── pom.xml                       Maven（WAR）
+├── docker-compose.yml            開発環境（db / db-init / app / mail）
+├── docker/                       Dockerfile と DB 初期化スクリプト
+├── docs/                         設計ドキュメント（basic-design/、diagrams/）
+├── e2e/                          画面の一括動作確認スクリプト（Playwright）
+└── src/
+    ├── main/java/com/example/appmgmt/
+    │   ├── common/               設定、DataSource、トランザクション、例外、メッセージ、書式
+    │   ├── domain/               エンティティと区分値（Codes、StatusCd）
+    │   ├── dao/                  テーブル単位の DAO（PreparedStatement）
+    │   ├── service/              業務サービス（transition = F14 ステータス遷移制御）
+    │   ├── infra/                メール送信、審査担当部門システム API クライアント、スケジューラ
+    │   └── web/                  Filter、Servlet（画面・外部 IF）、Form、EL 関数
+    ├── main/resources/
+    │   ├── application.properties  設定の既定値
+    │   ├── messages.properties     メッセージ一覧
+    │   ├── notification-templates.properties  通知メールの文面
+    │   └── db/migration/           Flyway（V1 DDL、V2 初期データ）、db/vendor/{sqlserver,h2}
+    ├── main/webapp/              web.xml、JSP（WEB-INF/views）、Bootstrap（static/vendor）
+    └── test/java/                単体テストと LocalServer（組込み Tomcat 起動）
 ```
 
-## 想定する技術スタック（仮、実装前に確定）
+## 設計書との対応と未実装事項
 
-| 分類 | 想定 |
-| --- | --- |
-| 言語・Web | Java 17 以上、Jakarta Servlet／JSP |
-| AP サーバ | Apache Tomcat 10.1 系 |
-| DB | Microsoft SQL Server |
-| ビルド | Maven |
+- ステータス遷移はすべて `StatusTransitionService`（F14）を通り、遷移マスタ 55 行・条件評価・操作主体の照合・後続処理を [10. 機能詳細](docs/basic-design/10-function-detail.md) のとおり実装している。
+- 未実装・簡略化：ログイン失敗回数によるロック（99 No.30）、通知の送信エラーを再送する画面（No.31）、承認ルートの適用期間の重なり警告、社員無効化時の警告（SC11）。承認ルートマスタの明細は最大 5 ステップまで画面で編集できる。
+- 審査担当部門システムの API 仕様は未入手のため、送信電文・受信電文は [12. 外部インターフェース設計](docs/basic-design/12-external-interface.md) の仮仕様で実装している。
 
 ## ドキュメント
 

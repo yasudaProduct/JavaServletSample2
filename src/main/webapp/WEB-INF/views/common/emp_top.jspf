@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><c:out value="${pageTitle}"/> | 申込管理システム</title>
+<link rel="stylesheet" href="${ctx}/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="${ctx}/static/css/app.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <a class="navbar-brand" href="${ctx}/emp/applications">申込管理システム</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navMenu"><span class="navbar-toggler-icon"></span></button>
+  <div class="collapse navbar-collapse" id="navMenu">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item"><a class="nav-link" href="${ctx}/emp/applications">申込一覧</a></li>
+      <c:if test="${user.owner}"><li class="nav-item"><a class="nav-link" href="${ctx}/emp/import">一括取込</a></li></c:if>
+      <c:if test="${user.admin}">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">マスタ</a>
+          <div class="dropdown-menu">
+            <a class="dropdown-item" href="${ctx}/emp/master/employees">社員マスタ</a>
+            <a class="dropdown-item" href="${ctx}/emp/master/company-divs">会社区分マスタ</a>
+            <a class="dropdown-item" href="${ctx}/emp/master/approval-routes">承認ルートマスタ</a>
+          </div>
+        </li>
+      </c:if>
+      <c:if test="${applicationScope.devTools}">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle text-warning" href="#" data-toggle="dropdown">開発支援</a>
+          <div class="dropdown-menu">
+            <a class="dropdown-item" href="${ctx}/emp/dev/notifications">通知一覧（メール）</a>
+            <a class="dropdown-item" href="${ctx}/emp/dev/external-mock">審査担当部門システム（モック）</a>
+          </div>
+        </li>
+      </c:if>
+    </ul>
+    <c:if test="${not empty user}">
+      <span class="navbar-text mr-3">
+        <c:out value="${user.employeeName}"/>（<c:out value="${user.roleName}"/>／<c:out value="${user.companyDivName}"/>／部署 <c:out value="${user.deptCd}"/>）
+      </span>
+      <form method="post" action="${ctx}/emp/logout" class="form-inline">
+        <input type="hidden" name="_csrf" value="${csrf}">
+        <button type="submit" class="btn btn-outline-light btn-sm">ログアウト</button>
+      </form>
+    </c:if>
+  </div>
+</nav>
+<main class="container-fluid py-3 app-main">
+  <h1 class="h4 mb-3"><c:out value="${pageTitle}"/></h1>
+  <c:forEach var="m" items="${messages}">
+    <div class="alert alert-${m.level}" role="alert"><c:out value="${m.text}"/></div>
+  </c:forEach>

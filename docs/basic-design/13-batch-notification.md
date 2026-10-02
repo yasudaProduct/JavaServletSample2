@@ -79,6 +79,12 @@
 | extapi.connect-timeout-ms／read-timeout-ms | 5000／30000 | 外部 API の接続・読取タイムアウト |
 | consent.token-expire-days | 14 | 確認用トークンの有効期限（日）。3.4 節 |
 | app.applicant-base-url／app.employee-base-url | － | 申込者向け確認 URL のベース URL（例：https://apply.example.com）／社員向け画面リンクのベース URL（社内向け） |
+| mail.mode | log | メール送信方式。`log`：送信せずログ出力（開発用）、`smtp`：SMTP 送信 |
+| extapi.mode | mock | 外部送信方式。`mock`：送信せず受付番号を採番（開発用。結果は開発支援画面から返す）、`http`：extapi.base-url へ送信 |
+| extapi.inbound.api-key／extapi.inbound.allowed-ips | －／－ | IF02／IF04 受信の API キーと接続元 IP 許可リスト（カンマ区切り）。空なら検証しない（開発用） |
+| app.external-system-id | EXT01 | 審査担当部門システムからの結果受信をステータス履歴に記録するときの操作者 ID |
+| app.dev-tools.enabled | true | 開発支援画面の有効化。本番は false |
+| db.url／db.user／db.password／db.pool.max-size／db.startup-wait-seconds | －／－／－／10／120 | JDBC 接続情報、接続プール数、起動時に DB へ接続できるまで待つ秒数 |
 
 ## 3. 通知設計
 

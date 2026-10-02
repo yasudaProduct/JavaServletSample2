@@ -1,0 +1,176 @@
+package com.example.appmgmt.service.consent;
+
+import com.example.appmgmt.common.BusinessException;
+import com.example.appmgmt.common.ForbiddenException;
+import com.example.appmgmt.common.TokenUtil;
+import com.example.appmgmt.common.TransitionNotAllowedException;
+import com.example.appmgmt.common.Tx;
+import com.example.appmgmt.dao.ApplicantConsentDao;
+import com.example.appmgmt.dao.ApplicantDao;
+import com.example.appmgmt.dao.ApplicationDao;
+import com.example.appmgmt.dao.ApplicationVersionDao;
+import com.example.appmgmt.dao.StatusDao;
+import com.example.appmgmt.domain.ApplicantConsent;
+import com.example.appmgmt.domain.Application;
+import com.example.appmgmt.domain.ApplicationVersion;
+import com.example.appmgmt.domain.Codes;
+import com.example.appmgmt.domain.StatusCd;
+import com.example.appmgmt.service.transition.StatusTransitionService;
+import com.example.appmgmt.service.transition.TransitionRequest;
+import com.example.appmgmt.service.transition.TransitionResult;
+import java.sql.Connection;
+import java.time.LocalDateTime;
+
+/** F07 申込者確認・同意。 */
+public class ConsentService {
+
+    private final ApplicantConsentDao consentDao;
+    private final ApplicationDao applicationDao;
+    private final ApplicationVersionDao versionDao;
+    private final ApplicantDao applicantDao;
+    private final StatusDao statusDao;
+    private final StatusTransitionService transitionService;
+
+    public ConsentService(ApplicantConsentDao consentDao, ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantDao applicantDao, StatusDao statusDao,
+                          StatusTransitionService transitionService) {
+        this.consentDao = consentDao;
+        this.applicationDao = applicationDao;
+        this.versionDao = versionDao;
+        this.applicantDao = applicantDao;
+        this.statusDao = statusDao;
+        this.transitionService = transitionService;
+    }
+
+    /** 8.3 トークン検証（全リクエスト共通）。 */
+    public ConsentView resolve(String token) {
+        return Tx.execute(conn -> resolve(conn, token));
+    }
+
+    public ConsentView resolve(Connection conn, String token) {
+        ConsentView v = new ConsentView();
+        if (!TokenUtil.looksLikeToken(token)) {
+            v.setOutcome(ConsentView.Outcome.INVALID);
+            return v;
+        }
+        ApplicantConsent c = consentDao.findByTokenHash(conn, TokenUtil.sha256Hex(token)).orElse(null);
+        if (c == null) {
+            v.setOutcome(ConsentView.Outcome.INVALID);
+            return v;
+        }
+        v.setConsent(c);
+        Application app = applicationDao.findById(conn, c.getApplicationId()).orElse(null);
+        if (app == null || Codes.CONSENT_INVALID.equals(c.getConsentStatus())) {
+            v.setOutcome(ConsentView.Outcome.INVALID);
+            return v;
+        }
+        v.setApplication(app);
+        v.setApplicant(applicantDao.findById(conn, app.getApplicantId()).orElse(null));
+        v.setStatus(statusDao.find(conn, app.getStatusCd()).orElse(null));
+        v.setVersion(versionDao.find(conn, app.getApplicationId(), c.getVersionNo()).orElse(null));
+        if (v.isContractChange() && app.getReviewedVersionNo() != null) {
+            v.setBeforeVersion(versionDao.find(conn, app.getApplicationId(), app.getReviewedVersionNo()).orElse(null));
+        }
+        if (Codes.CONSENT_AGREED.equals(c.getConsentStatus()) || Codes.CONSENT_RETURNED.equals(c.getConsentStatus())) {
+            v.setOutcome(ConsentView.Outcome.COMPLETED);
+            return v;
+        }
+        if (c.getTokenExpiresAt().isBefore(LocalDateTime.now())) {
+            v.setOutcome(ConsentView.Outcome.EXPIRED);
+            return v;
+        }
+        if (c.getVersionNo() != app.getCurrentVersionNo()) {
+            v.setOutcome(ConsentView.Outcome.INVALID);
+            return v;
+        }
+        if (StatusCd.CONTENT_CONFIRM_WAIT.contains(app.getStatusCd())) {
+            v.setOutcome(ConsentView.Outcome.CONFIRM);
+        } else if (StatusCd.AGREE_WAIT.contains(app.getStatusCd())) {
+            v.setOutcome(ConsentView.Outcome.AGREE);
+        } else {
+            v.setOutcome(ConsentView.Outcome.COMPLETED);
+        }
+        return v;
+    }
+
+    private ConsentView requireActive(Connection conn, String token) {
+        ConsentView v = resolve(conn, token);
+        if (v.getOutcome() != ConsentView.Outcome.CONFIRM && v.getOutcome() != ConsentView.Outcome.AGREE) {
+            throw new ForbiddenException();
+        }
+        return v;
+    }
+
+    private TransitionRequest request(ConsentView v, String actionCd, String ip) {
+        Application app = v.getApplication();
+        return TransitionRequest.of(app.getApplicationId(), app.getRowVersion(), actionCd, Codes.ACTOR_APPLICANT, String.valueOf(app.getApplicantId()))
+                .consentId(v.getConsent().getConsentId()).clientIp(ip);
+    }
+
+    /** AP02 保存（10301 のみ）。現行版をそのまま更新する。 */
+    public void saveEdit(String token, ApplicationVersion content) {
+        Tx.executeVoid(conn -> {
+            ConsentView v = requireActive(conn, token);
+            if (!StatusCd.CONFIRM_WAIT.equals(v.getApplication().getStatusCd())) {
+                throw new TransitionNotAllowedException();
+            }
+            ApplicationVersion cur = v.getVersion();
+            cur.setProductCd(content.getProductCd());
+            cur.setBasicFee(content.getBasicFee());
+            cur.setOptionFee(content.getOptionFee());
+            cur.setHandlingFee(content.getHandlingFee());
+            cur.setContractStartDate(content.getContractStartDate());
+            cur.setContractEndDate(content.getContractEndDate());
+            cur.setRemarks(content.getRemarks());
+            versionDao.updateContent(conn, cur);
+            applicationDao.touch(conn, cur.getApplicationId(), v.getApplication().getRowVersion());
+        });
+    }
+
+    /** AP01 確定（10301／20301 → 10302／20302）。 */
+    public TransitionResult confirm(String token, String ip) {
+        return Tx.execute(conn -> {
+            ConsentView v = requireActive(conn, token);
+            if (!StatusCd.CONTENT_CONFIRM_WAIT.contains(v.getApplication().getStatusCd())) {
+                throw new TransitionNotAllowedException();
+            }
+            consentDao.updateContentConfirmed(conn, v.getConsent().getConsentId(), LocalDateTime.now().withNano(0), ip);
+            return transitionService.transition(conn, request(v, Codes.ACTION_CONFIRM, ip));
+        });
+    }
+
+    /** AP03 同意する。 */
+    public TransitionResult agree(String token, String ip) {
+        return Tx.execute(conn -> {
+            ConsentView v = requireActive(conn, token);
+            if (!StatusCd.AGREE_WAIT.contains(v.getApplication().getStatusCd())) {
+                throw new TransitionNotAllowedException();
+            }
+            return transitionService.transition(conn, request(v, Codes.ACTION_CONSENT, ip));
+        });
+    }
+
+    /** AP03 差戻し（理由必須）。 */
+    public TransitionResult returnToOwner(String token, String reason, String ip) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException("E105");
+        }
+        return Tx.execute(conn -> {
+            ConsentView v = requireActive(conn, token);
+            if (!StatusCd.AGREE_WAIT.contains(v.getApplication().getStatusCd())) {
+                throw new TransitionNotAllowedException();
+            }
+            return transitionService.transition(conn, request(v, Codes.ACTION_APPLICANT_RETURN, ip).comment(reason));
+        });
+    }
+
+    /** AP03 修正（10302 のみ → 10301）。 */
+    public TransitionResult modify(String token, String ip) {
+        return Tx.execute(conn -> {
+            ConsentView v = requireActive(conn, token);
+            if (!StatusCd.CONSENT_WAIT.equals(v.getApplication().getStatusCd())) {
+                throw new TransitionNotAllowedException();
+            }
+            return transitionService.transition(conn, request(v, Codes.ACTION_MODIFY, ip));
+        });
+    }
+}

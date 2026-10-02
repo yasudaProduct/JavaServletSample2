@@ -1,0 +1,55 @@
+<%-- 申込内容の入力欄。form：ApplicationForm、errors：項目名→メッセージ、amountsOnly：金額項目だけ編集可、base：比較元の版（任意） --%>
+<c:set var="ro" value="${amountsOnly ? 'readonly' : ''}"/>
+<div class="form-row">
+  <div class="form-group col-md-4">
+    <label for="productCd">商品コード <span class="badge badge-danger">必須</span></label>
+    <input type="text" class="form-control ${not empty errors.productCd ? 'is-invalid' : ''}" id="productCd" name="productCd" maxlength="10" value="<c:out value='${form.productCd}'/>" ${ro}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：<c:out value="${app:text(base.productCd)}"/></small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.productCd}"/></div>
+  </div>
+</div>
+<div class="form-row">
+  <div class="form-group col-md-3">
+    <label for="basicFee">基本料金（円） <span class="badge badge-danger">必須</span></label>
+    <input type="text" class="form-control text-right amount-input ${not empty errors.basicFee ? 'is-invalid' : ''}" id="basicFee" name="basicFee" maxlength="17" value="<c:out value='${form.basicFee}'/>" inputmode="numeric">
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：${app:amount(base.basicFee)}</small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.basicFee}"/></div>
+  </div>
+  <div class="form-group col-md-3">
+    <label for="optionFee">オプション料金（円）</label>
+    <input type="text" class="form-control text-right amount-input ${not empty errors.optionFee ? 'is-invalid' : ''}" id="optionFee" name="optionFee" maxlength="17" value="<c:out value='${form.optionFee}'/>" inputmode="numeric">
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：${app:amount(base.optionFee)}</small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.optionFee}"/></div>
+  </div>
+  <div class="form-group col-md-3">
+    <label for="handlingFee">事務手数料（円）</label>
+    <input type="text" class="form-control text-right amount-input ${not empty errors.handlingFee ? 'is-invalid' : ''}" id="handlingFee" name="handlingFee" maxlength="17" value="<c:out value='${form.handlingFee}'/>" inputmode="numeric">
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：${app:amount(base.handlingFee)}</small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.handlingFee}"/></div>
+  </div>
+  <div class="form-group col-md-3">
+    <label>申込金額合計（円）</label>
+    <input type="text" class="form-control-plaintext text-right font-weight-bold" id="totalAmount" value="<c:out value='${form.totalAmount}'/>" readonly>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：${app:amount(base.totalAmount)}　倍率：<span id="ratioPreview">－</span>（しきい値 ${app:ratio(ratioLimit)}）</small></c:if>
+  </div>
+</div>
+<div class="form-row">
+  <div class="form-group col-md-3">
+    <label for="contractStartDate">契約開始日</label>
+    <input type="text" class="form-control ${not empty errors.contractStartDate ? 'is-invalid' : ''}" id="contractStartDate" name="contractStartDate" placeholder="yyyy/MM/dd" maxlength="10" value="<c:out value='${form.contractStartDate}'/>" ${ro}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：${app:date(base.contractStartDate)}</small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.contractStartDate}"/></div>
+  </div>
+  <div class="form-group col-md-3">
+    <label for="contractEndDate">契約終了日</label>
+    <input type="text" class="form-control ${not empty errors.contractEndDate ? 'is-invalid' : ''}" id="contractEndDate" name="contractEndDate" placeholder="yyyy/MM/dd" maxlength="10" value="<c:out value='${form.contractEndDate}'/>" ${ro}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：${app:date(base.contractEndDate)}</small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.contractEndDate}"/></div>
+  </div>
+</div>
+<div class="form-group">
+  <label for="remarks">備考</label>
+  <textarea class="form-control ${not empty errors.remarks ? 'is-invalid' : ''}" id="remarks" name="remarks" rows="3" maxlength="1000" ${ro}><c:out value="${form.remarks}"/></textarea>
+  <c:if test="${not empty base}"><small class="form-text text-muted pre-wrap">比較元：<c:out value="${app:text(base.remarks)}"/></small></c:if>
+  <div class="invalid-feedback"><c:out value="${errors.remarks}"/></div>
+</div>

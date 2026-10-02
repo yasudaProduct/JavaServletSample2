@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><c:out value="${pageTitle}"/> | 申込管理システム</title>
+<link rel="stylesheet" href="${ctx}/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="${ctx}/static/css/app.css">
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-dark bg-primary"><span class="navbar-brand mb-0 h1">申込管理システム</span></nav>
+<main class="container py-4" style="max-width: 860px;">
+  <h1 class="h4 mb-3"><c:out value="${pageTitle}"/></h1>
+  <c:forEach var="m" items="${messages}">
+    <div class="alert alert-${m.level}" role="alert"><c:out value="${m.text}"/></div>
+  </c:forEach>

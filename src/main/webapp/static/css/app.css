@@ -1,0 +1,10 @@
+.app-main { min-height: calc(100vh - 140px); }
+.version-table th { white-space: nowrap; }
+.version-table td.diff { background-color: #fff3cd; font-weight: bold; }
+.pre-wrap { white-space: pre-wrap; }
+.status-badge { font-size: 95%; }
+table.table-sm td, table.table-sm th { vertical-align: middle; }
+.section-title { border-left: 4px solid #007bff; padding-left: .5rem; margin: 1.5rem 0 .75rem; }
+.mail-body { white-space: pre-wrap; font-family: monospace; font-size: .85rem; background: #f8f9fa; padding: .5rem; }
+.route-table td { vertical-align: middle; }
+.consent-url { word-break: break-all; }
