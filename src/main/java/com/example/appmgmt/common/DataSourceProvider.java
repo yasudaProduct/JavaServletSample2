@@ -34,8 +34,14 @@ public final class DataSourceProvider {
         if (dataSource != null) {
             return;
         }
+        String url = config.getString("db.url");
         HikariConfig hc = new HikariConfig();
-        hc.setJdbcUrl(config.getString("db.url"));
+        hc.setJdbcUrl(url);
+        // Tomcat では WEB-INF/lib のドライバを DriverManager が自動登録しないため、クラス名を明示する
+        String driver = driverClassName(url);
+        if (driver != null) {
+            hc.setDriverClassName(driver);
+        }
         hc.setUsername(config.getString("db.user"));
         hc.setPassword(config.getString("db.password"));
         hc.setMaximumPoolSize(config.getInt("db.pool.max-size", 10));
@@ -46,6 +52,17 @@ public final class DataSourceProvider {
         HikariDataSource ds = new HikariDataSource(hc);
         waitForDatabase(ds, config.getInt("db.startup-wait-seconds", 120));
         dataSource = ds;
+    }
+
+    /** JDBC URL からドライバクラスを決める。未知の URL は HikariCP の自動解決に任せる。 */
+    private static String driverClassName(String url) {
+        if (url != null && url.startsWith("jdbc:sqlserver:")) {
+            return "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+        }
+        if (url != null && url.startsWith("jdbc:h2:")) {
+            return "org.h2.Driver";
+        }
+        return null;
     }
 
     private static void waitForDatabase(DataSource ds, int waitSeconds) {
