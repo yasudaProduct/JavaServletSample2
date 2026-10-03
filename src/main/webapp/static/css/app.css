@@ -13,3 +13,5 @@ table.table-sm td, table.table-sm th { vertical-align: middle; }
 .tile-disabled .card-title { color: #6c757d; }
 .menu-head { border-left: 4px solid #007bff; }
 .nav-tabs .nav-link.active { font-weight: bold; }
+.dev-link { opacity: .7; }
+.dev-link:hover { opacity: 1; }

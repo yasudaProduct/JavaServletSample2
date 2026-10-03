@@ -15,6 +15,7 @@ public class MenuTile {
     private String note;
     private String style = "primary";
     private boolean reasonInput;
+    private String buttonLabel;
 
     public MenuTile(String key, String title, String description) {
         this.key = key;
@@ -28,6 +29,8 @@ public class MenuTile {
     public MenuTile disabled(String note) { this.enabled = false; this.note = note; return this; }
     public MenuTile style(String style) { this.style = style; return this; }
     public MenuTile withReasonInput() { this.reasonInput = true; return this; }
+    /** ボタンの文言をタイトルと変える（タイルの位置・タイトルは固定のまま）。 */
+    public MenuTile buttonLabel(String buttonLabel) { this.buttonLabel = buttonLabel; return this; }
 
     public String getKey() { return key; }
     public String getTitle() { return title; }
@@ -40,4 +43,5 @@ public class MenuTile {
     public String getStyle() { return style; }
     public boolean isReasonInput() { return reasonInput; }
     public boolean isPost() { return formAction != null; }
+    public String getButtonLabel() { return buttonLabel == null ? title : buttonLabel; }
 }

@@ -106,6 +106,17 @@ async function applyApproval(page, appId, { approvers = null, expectInitial = nu
   await page.click('button[value=apply]'); await page.waitForLoadState('networkidle');
   console.log('    apply:', (await alerts(page)).slice(0, 60));
 }
+// SC14 のタイルは常に同じ並び（活性・非活性だけが変わる）。申込入力へのタイルはなく、SC03 は開発者向けリンクだけ
+const TILE_KEYS = ['confirm', 'revise', 'approval', 'startChange', 'pullBack', 'cancel', 'additional', 'resendConsent', 'resendExternal'];
+async function checkTiles(page, appId, label) {
+  await page.goto(BASE + '/emp/applications/' + appId + '/menu');
+  const keys = await page.locator('.tile').evaluateAll(els => els.map(e => e.id.replace('tile-', '')));
+  if (keys.join(',') !== TILE_KEYS.join(',')) throw new Error(`[${label}] tiles = ${keys.join(',')}`);
+  if (await page.locator('#devDetailLink').count() !== 1) throw new Error(`[${label}] developer link missing`);
+  if (await page.locator('#tile-detail, #tile-input, #tile-modify, #tile-fullRevise').count() !== 0) throw new Error(`[${label}] unexpected tiles`);
+  const enabled = await page.locator('.tile:not(.tile-disabled)').evaluateAll(els => els.map(e => e.id.replace('tile-', '')));
+  console.log(`OK  タイル固定（${label}）: 活性 = ${enabled.join(',')}`);
+}
 async function approve(page, appId, action, comment = '') {
   await page.goto(BASE + '/emp/applications/' + appId + '/approval');
   await shot(page, 'SC06-' + action);
@@ -134,7 +145,22 @@ async function portalLogin(apPage, id, pw) {
     const a = await createApplication(page, 'C0000000001', '1000000', '200000');
     await expectStatus(page, '10201', '確定後（メニュー）');
     await shot(page, 'SC14-10201');
+    await checkTiles(page, a.appId, '10201');
+    // 10201 → SC05「修正」→ 10101（申込入力）→ 確認へ → 確定 → 10201（メニューに入力画面へのタイルはない）
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/confirm'); await shot(page, 'SC05-10201');
+    await page.click('#modifyBtn'); await page.waitForURL('**/edit');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/menu'); await expectStatus(page, '10101', 'SC05 の修正で入力中へ');
+    await checkTiles(page, a.appId, '10101');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/edit'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    await page.click('#confirmBtn'); await page.waitForURL(/\/menu$/); await expectStatus(page, '10201', 'SC05 で再確定');
     await applyApproval(page, a.appId, { expectInitial: ['一郎'], label: '一次承認 初期回付先（テンプレート）' }); await expectStatus(page, '10202', '一次承認申請');
+    // 申請した担当者は申請中の承認フローを参照できる（申請ボタンは非活性、引戻しは非活性）
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/approval'); await shot(page, 'SC06-requester-view');
+    if (await page.locator('#applyBtn:disabled').count() !== 1) throw new Error('requester view: 申請 button should be disabled');
+    if (await page.locator('button[value=apply]').count() !== 0) throw new Error('requester view: apply form should not be submittable');
+    console.log('OK  申請者の承認フロー参照（10202）: ' + (await page.locator('#viewNote').textContent()).trim().slice(0, 50));
+    await checkTiles(page, a.appId, '10202');
+    if (await page.locator('#tile-pullBack.tile-disabled').count() !== 1) throw new Error('10202: 引戻し should be disabled');
     await logout(page);
 
     await login(page, 'A002'); await shot(page, 'SC02-approver');
@@ -217,6 +243,13 @@ async function portalLogin(apPage, id, pw) {
     await logout(page);
     await login(page, 'A001');
     await menuAction(page, a.appId, 'startChange'); await expectStatus(page, '20101', '契約変更開始（取消テスト）');
+    // 20101 → 確定 → 20501 → SC09「修正」→ 20101 → 契約変更の取消
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/change');
+    await page.fill('#handlingFee', '10000'); await page.click('button[value=confirm]'); await page.waitForURL('**/change/confirm');
+    await page.click('#confirmBtn'); await page.waitForLoadState('networkidle'); await expectStatus(page, '20501', '契約変更確定（取消テスト）');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/change/confirm'); await shot(page, 'SC09-20501');
+    await page.click('#modifyBtn'); await page.waitForURL('**/change');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/menu'); await expectStatus(page, '20101', 'SC09 の修正で契約変更入力中へ');
     await menuAction(page, a.appId, 'cancel', '契約変更は不要になりました'); await expectStatus(page, '10701', '契約変更の取消 → 審査完了へ復元');
     console.log('    ', (await alerts(page)).slice(0, 40));
 
@@ -262,7 +295,11 @@ async function portalLogin(apPage, id, pw) {
     await expectStatus(page, '10401', 'B 修正対応（基準内）→ 事前確認再依頼');
     await mockResult(page, b.appNo, 'OK');
     await page.goto(BASE + '/emp/applications/' + b.appId); await expectStatus(page, '10501', 'B 事前確認 OK');
-    await menuAction(page, b.appId, 'fullRevise'); await page.goto(BASE + '/emp/applications/' + b.appId); await expectStatus(page, '10101', 'B 全体修正');
+    // 全体修正は SC05「修正（全体修正）」から（メニューに入力画面への遷移はない）
+    await page.goto(BASE + '/emp/applications/' + b.appId + '/confirm'); await shot(page, 'SC05-10501');
+    page.once('dialog', d => d.accept());
+    await page.click('#modifyBtn'); await page.waitForURL('**/edit');
+    await page.goto(BASE + '/emp/applications/' + b.appId + '/menu'); await expectStatus(page, '10101', 'B 全体修正（SC05 の修正）');
     await page.goto(BASE + '/emp/applications/' + b.appId + '/edit'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
     await page.click('button[value=confirm]'); await page.waitForLoadState('networkidle'); await expectStatus(page, '10201', 'B 再確定');
     await applyApproval(page, b.appId, { approvers: [] }); await expectStatus(page, '10301', 'B 回付先なし 2');

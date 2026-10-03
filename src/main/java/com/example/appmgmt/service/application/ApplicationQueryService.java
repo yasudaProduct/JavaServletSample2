@@ -221,10 +221,15 @@ public class ApplicationQueryService {
             if (!transitionDao.findCandidates(conn, st, Codes.ACTION_CANCEL, d.getCompanyDiv().getPreCheckFlg()).isEmpty()) {
                 a.add(StatusCd.isContractChange(st) ? "cancelChange" : "cancel");
             }
+            // 修正（操作コード 01）は遷移マスタに該当行があるステータスだけ（10100／10201／20201／20501 の修正、10402／10501 の全体修正）。
+            // 入力画面へはメニューからではなく SC05／SC09 の「修正」ボタンから進む
+            if (!transitionDao.findCandidates(conn, st, Codes.ACTION_MODIFY, d.getCompanyDiv().getPreCheckFlg()).isEmpty()) {
+                a.add(StatusCd.isContractChange(st) ? "modifyChange" : "modify");
+            }
             switch (st) {
                 case StatusCd.IMPORTED: a.add("confirm"); break;
-                case StatusCd.INPUT: a.add("input"); break;
-                case StatusCd.PRIMARY_WAIT: a.add("modify"); a.add("request"); a.add("confirm"); break;
+                case StatusCd.INPUT: a.add("input"); a.add("confirm"); break;
+                case StatusCd.PRIMARY_WAIT: a.add("request"); break;
                 case StatusCd.CONFIRM_WAIT: case StatusCd.CONSENT_WAIT: case StatusCd.CHG_CONFIRM_WAIT: case StatusCd.CHG_CONSENT_WAIT:
                     a.add("pullBack"); a.add("resendConsent"); break;
                 case StatusCd.PRECHECK_WAIT: case StatusCd.REVIEWING: case StatusCd.CHG_PRECHECK_WAIT: case StatusCd.CHG_REVIEWING:
@@ -232,8 +237,8 @@ public class ApplicationQueryService {
                 case StatusCd.FIX_WAIT: a.add("fix"); a.add("fullRevise"); break;
                 case StatusCd.FINAL_WAIT: a.add("request"); a.add("revise"); a.add("fullRevise"); break;
                 case StatusCd.REVIEWED: case StatusCd.CHG_REVIEWED: a.add("startChange"); break;
-                case StatusCd.CHG_INPUT: a.add("inputChange"); break;
-                case StatusCd.CHG_PRIMARY_WAIT: case StatusCd.CHG_FINAL_WAIT: a.add("modifyChange"); a.add("request"); a.add("confirmChange"); break;
+                case StatusCd.CHG_INPUT: a.add("inputChange"); a.add("confirmChange"); break;
+                case StatusCd.CHG_PRIMARY_WAIT: case StatusCd.CHG_FINAL_WAIT: a.add("request"); break;
                 case StatusCd.CHG_FIX_WAIT: a.add("fix"); break;
                 default: break;
             }
@@ -241,6 +246,9 @@ public class ApplicationQueryService {
         if (currentApprover && StatusCd.APPROVAL_IN_PROGRESS.contains(st)) {
             a.add("approvalFlow");
         } else if (user.isApprover() && StatusCd.APPROVAL_IN_PROGRESS.contains(st)) {
+            a.add("approvalFlowView");
+        } else if (owner && StatusCd.APPROVAL_IN_PROGRESS.contains(st)) {
+            // 申請した担当者は申請中の状況を参照できる（申請ボタンは非活性、引戻し不可）
             a.add("approvalFlowView");
         }
         if (user.isAdmin() && StatusCd.EXTERNAL_WAIT.contains(st) && sendError) {

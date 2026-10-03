@@ -23,4 +23,5 @@
 </div>
 <h3 class="h6 section-title">この申込に対する操作</h3>
 <%@ include file="/WEB-INF/views/common/menu_tiles.jspf" %>
+<p class="text-right mt-4 mb-0"><a class="small text-muted dev-link" id="devDetailLink" href="${ctx}/emp/applications/${a.applicationId}">開発者向け：申込確認（SC03 詳細）</a></p>
 <%@ include file="/WEB-INF/views/common/emp_bottom.jspf" %>

@@ -65,33 +65,58 @@ public class ApprovalService {
             String st = app.getStatusCd();
             ApprovalFlowView v = new ApprovalFlowView();
             v.setDetail(d);
+            List<ApprovalRequest> history = requestDao.findByApplication(conn, applicationId);
+            v.setHistory(history);
+            ApprovalRequest active = requestDao.findActive(conn, applicationId).orElse(null);
             String type = Codes.approvalTypeOf(st);
             if (type == null) {
-                throw new TransitionNotAllowedException();
+                // 申請待ち・申請中以外（参照）：進行中または直近の申請の承認種別を表示に使う
+                type = active != null ? active.getApprovalType() : history.isEmpty() ? null : history.get(0).getApprovalType();
             }
             v.setApprovalType(type);
             v.setFinalApproval(Codes.isFinalApprovalType(type));
-            v.setHistory(requestDao.findByApplication(conn, applicationId));
-            if (StatusCd.APPROVAL_WAIT.contains(st)) {
-                if (!user.isOwner() || app.getOwnerEmployeeId() != user.getEmployeeId()) {
-                    throw new ForbiddenException();
-                }
+            boolean applicationOwner = user.isOwner() && app.getOwnerEmployeeId() == user.getEmployeeId();
+            v.setOwnerViewer(user.isOwner());
+            v.setApproverViewer(user.isApprover());
+            if (StatusCd.APPROVAL_WAIT.contains(st) && applicationOwner) {
                 v.setMode(ApprovalFlowView.Mode.WAIT);
                 v.setTemplate(routeDao.findTemplate(conn, app.getCompanyDiv(), app.getDeptCd(), type, LocalDate.now()).orElse(null));
                 v.setCandidates(employeeDao.findApproverCandidates(conn, app.getCompanyDiv()));
                 v.setCanOperate(true);
                 resolveInitialRoute(conn, v, app, type, user);
-            } else {
-                ApprovalRequest active = requestDao.findActive(conn, applicationId).orElseThrow(TransitionNotAllowedException::new);
-                v.setActiveRequest(active);
-                ApprovalStep step = active.currentStep();
-                boolean operator = user.isApprover() && step != null && step.getApproverEmployeeId() == user.getEmployeeId();
-                v.setMode(operator ? ApprovalFlowView.Mode.IN_PROGRESS : ApprovalFlowView.Mode.VIEW);
-                v.setCanOperate(operator);
-                v.setCurrentIsFinalStep(active.getFinalStepNo() != null && active.getFinalStepNo().equals(active.getCurrentStepNo()));
+                return v;
+            }
+            // 申請中（承認者が操作）または参照。申請した担当者も申請中の状況を参照できる（申請ボタンは非活性、引戻し不可）
+            v.setActiveRequest(active);
+            ApprovalStep step = active == null ? null : active.currentStep();
+            boolean operator = active != null && user.isApprover() && step != null && step.getApproverEmployeeId() == user.getEmployeeId();
+            v.setMode(operator ? ApprovalFlowView.Mode.IN_PROGRESS : ApprovalFlowView.Mode.VIEW);
+            v.setCanOperate(operator);
+            v.setCurrentIsFinalStep(active != null && active.getFinalStepNo() != null && active.getFinalStepNo().equals(active.getCurrentStepNo()));
+            if (!operator) {
+                v.setViewNote(viewNote(st, active != null, user, applicationOwner));
             }
             return v;
         });
+    }
+
+    /** 参照モードで操作できない理由。 */
+    private static String viewNote(String st, boolean hasActive, LoginUser user, boolean applicationOwner) {
+        if (user.isOwner()) {
+            if (hasActive) {
+                return applicationOwner
+                        ? "承認申請中のため申請はできません。承認者の処理をお待ちください（申請者による引戻しはできません）。"
+                        : "承認申請中です。この申込の担当者ではないため参照のみです。";
+            }
+            if (StatusCd.APPROVAL_WAIT.contains(st)) {
+                return "この申込の担当者だけが申請できます。";
+            }
+            return "申請待ち（一次承認申請待ち・最終承認申請待ち）のステータスではないため申請はできません。";
+        }
+        if (user.isApprover()) {
+            return hasActive ? "現在ステップの承認者ではないため参照のみです。" : "進行中の承認申請はありません。";
+        }
+        return "参照のみです。";
     }
 
     /**

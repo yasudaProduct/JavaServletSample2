@@ -1,4 +1,4 @@
-<c:set var="pageTitle" value="SC03 申込確認"/>
+<c:set var="pageTitle" value="SC03 申込確認（開発者向け）"/>
 <c:set var="a" value="${d.application}"/>
 <%@ include file="/WEB-INF/views/common/emp_top.jspf" %>
 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -6,6 +6,7 @@
     <h2 class="h5 mb-1">申込番号 <c:out value="${a.applicationNo}"/>
       <span class="badge badge-${fn:endsWith(a.statusCd, '701') ? 'success' : a.statusCd == '90101' ? 'dark' : 'primary'} status-badge ml-2">${a.statusCd} <c:out value="${d.status.statusName}"/></span></h2>
     <div class="text-muted small"><c:out value="${d.status.description}"/></div>
+    <div class="small text-muted">開発者向けの参照画面です。申込に対する操作は申込メニューから行います。</div>
   </div>
   <div>
     <a class="btn btn-primary btn-sm" href="${ctx}/emp/applications/${a.applicationId}/menu">申込メニューへ</a>

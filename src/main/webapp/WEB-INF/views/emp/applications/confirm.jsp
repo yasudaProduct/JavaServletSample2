@@ -10,11 +10,19 @@
 </c:if>
 <c:set var="cur" value="${d.currentVersion}"/><c:set var="base" value="${null}"/><c:set var="curLabel" value="申込内容"/>
 <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
-<form method="post" action="${ctx}/emp/applications/${a.applicationId}/confirm">
-  <input type="hidden" name="_csrf" value="${csrf}">
-  <input type="hidden" name="rowVersion" value="${a.rowVersion}">
-  <button type="submit" name="action" value="modify" class="btn btn-outline-primary mr-2">修正</button>
-  <c:if test="${canConfirm}"><button type="submit" name="action" value="confirm" class="btn btn-primary mr-2">確定（一次承認申請待ちへ）</button></c:if>
-  <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
-</form>
+<div class="d-flex flex-wrap align-items-start">
+  <form method="post" action="${ctx}/emp/applications/${a.applicationId}/confirm" class="mr-2 mb-2" ${fullRevise and canModify ? 'data-confirm="申込内容全体を修正し直すため入力中へ戻します。申込者の同意は取り直しになります。よろしいですか？"' : ''}>
+    <input type="hidden" name="_csrf" value="${csrf}">
+    <input type="hidden" name="rowVersion" value="${a.rowVersion}">
+    <button type="submit" name="action" value="modify" class="btn ${fullRevise and canModify ? 'btn-outline-warning' : 'btn-outline-primary'}" id="modifyBtn" ${canModify ? '' : 'disabled'}>修正${fullRevise and canModify ? '（全体修正）' : ''}</button>
+  </form>
+  <form method="post" action="${ctx}/emp/applications/${a.applicationId}/confirm" class="mr-2 mb-2">
+    <input type="hidden" name="_csrf" value="${csrf}">
+    <input type="hidden" name="rowVersion" value="${a.rowVersion}">
+    <button type="submit" name="action" value="confirm" class="btn btn-primary" id="confirmBtn" ${canConfirm ? '' : 'disabled'}>確定（一次承認申請待ちへ）</button>
+  </form>
+  <a class="btn btn-outline-secondary mb-2" href="${ctx}/emp/applications/${a.applicationId}/menu">メニューへ戻る</a>
+</div>
+<c:if test="${not empty modifyNote}"><p class="small text-muted mb-1"><c:out value="${modifyNote}"/></p></c:if>
+<c:if test="${not empty confirmNote}"><p class="small text-muted mb-1"><c:out value="${confirmNote}"/></p></c:if>
 <%@ include file="/WEB-INF/views/common/emp_bottom.jspf" %>

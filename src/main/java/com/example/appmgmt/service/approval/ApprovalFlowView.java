@@ -23,6 +23,9 @@ public class ApprovalFlowView {
     private List<ApprovalRequest> history = new ArrayList<>();
     private List<Long> initialApproverIds = new ArrayList<>();
     private String routeSource = "";
+    private String viewNote = "";
+    private boolean ownerViewer;
+    private boolean approverViewer;
 
     public ApplicationDetail getDetail() { return detail; }
     public void setDetail(ApplicationDetail detail) { this.detail = detail; }
@@ -31,7 +34,16 @@ public class ApprovalFlowView {
     public String getModeName() { return mode.name(); }
     public String getApprovalType() { return approvalType; }
     public void setApprovalType(String approvalType) { this.approvalType = approvalType; }
-    public String getApprovalTypeName() { return com.example.appmgmt.domain.Codes.label("APPROVAL_TYPE", approvalType); }
+    public String getApprovalTypeName() { return approvalType == null ? "－" : com.example.appmgmt.domain.Codes.label("APPROVAL_TYPE", approvalType); }
+    /** 参照モードのときに表示する説明（操作できない理由）。 */
+    public String getViewNote() { return viewNote; }
+    public void setViewNote(String viewNote) { this.viewNote = viewNote; }
+    /** 閲覧者が担当者権限（申請ボタンを非活性で表示する）。 */
+    public boolean isOwnerViewer() { return ownerViewer; }
+    public void setOwnerViewer(boolean ownerViewer) { this.ownerViewer = ownerViewer; }
+    /** 閲覧者が承認者権限（承認・差戻しボタンを非活性で表示する）。 */
+    public boolean isApproverViewer() { return approverViewer; }
+    public void setApproverViewer(boolean approverViewer) { this.approverViewer = approverViewer; }
     public boolean isFinalApproval() { return finalApproval; }
     public void setFinalApproval(boolean finalApproval) { this.finalApproval = finalApproval; }
     public ApprovalRoute getTemplate() { return template; }

@@ -3,7 +3,7 @@
 <%@ include file="/WEB-INF/views/common/emp_top.jspf" %>
 <div class="card mb-3"><div class="card-body py-2 small">
   <strong>申込番号：</strong><c:out value="${a.applicationNo}"/>　<strong>申込者：</strong><c:out value="${d.applicant.applicantName}"/>　<strong>ステータス：</strong><c:out value="${d.status.displayName}"/>　
-  <strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　<strong>承認種別：</strong><c:out value="${v.approvalTypeName}"/>　<strong>モード：</strong>${v.modeName == 'WAIT' ? '申請待ち' : v.modeName == 'IN_PROGRESS' ? '申請中（承認者）' : '申請中（参照）'}
+  <strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　<strong>承認種別：</strong><c:out value="${v.approvalTypeName}"/>　<strong>モード：</strong>${v.modeName == 'WAIT' ? '申請待ち' : v.modeName == 'IN_PROGRESS' ? '申請中（承認者）' : empty v.activeRequest ? '参照' : '申請中（参照）'}
 </div></div>
 <div class="row">
   <div class="col-lg-6">
@@ -36,8 +36,8 @@
             <button type="button" class="btn btn-outline-secondary btn-sm" id="resetRoute">テンプレートに戻す</button>
           </div>
           <p class="small">最終承認者：<strong id="finalApproverName">－</strong></p>
-          <button type="submit" name="action" value="apply" class="btn btn-success mr-2">申請</button>
-          <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
+          <button type="submit" name="action" value="apply" class="btn btn-success mr-2" id="applyBtn">申請</button>
+          <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">メニューへ戻る</a>
         </form>
         <script type="application/json" id="routeCandidates">[<c:forEach var="e" items="${v.candidates}" varStatus="st">{"id":${e.employeeId},"name":"${fn:escapeXml(e.employeeName)}","dept":"${fn:escapeXml(e.deptCd)}"}${st.last ? '' : ','}</c:forEach>]</script>
         <script type="application/json" id="routeInitial">[<c:forEach var="id" items="${initialApproverIds}" varStatus="st">${id}${st.last ? '' : ','}</c:forEach>]</script>
@@ -45,6 +45,8 @@
       <c:otherwise>
         <h3 class="h6 section-title">承認申請（進行中）</h3>
         <c:set var="r" value="${v.activeRequest}"/>
+        <c:if test="${empty r}"><p class="text-muted small">進行中の承認申請はありません。</p></c:if>
+        <c:if test="${not empty r}">
         <p class="small mb-2">申請者：<c:out value="${r.requestEmployeeName}"/>　申請日時：${app:datetime(r.requestedAt)}　現在ステップ：${r.currentStepNo}／${r.finalStepNo}</p>
         <table class="table table-sm table-bordered">
           <thead class="thead-light"><tr><th>ステップ</th><th>承認者</th><th>結果</th><th>コメント</th><th>処理日時</th></tr></thead>
@@ -54,6 +56,7 @@
             </c:forEach>
           </tbody>
         </table>
+        </c:if>
         <c:if test="${v.canOperate}">
           <form method="post" action="${ctx}/emp/applications/${a.applicationId}/approval">
             <input type="hidden" name="_csrf" value="${csrf}">
@@ -72,12 +75,14 @@
               </c:otherwise>
             </c:choose>
             <button type="submit" name="action" value="return" class="btn btn-warning mr-2">差戻し</button>
-            <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
+            <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">メニューへ戻る</a>
           </form>
         </c:if>
         <c:if test="${not v.canOperate}">
-          <p class="text-muted small">現在ステップの承認者ではないため参照のみです。</p>
-          <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
+          <p class="text-muted small" id="viewNote"><c:out value="${v.viewNote}"/></p>
+          <c:if test="${v.ownerViewer}"><button type="button" class="btn btn-success mr-2" id="applyBtn" disabled>申請</button></c:if>
+          <c:if test="${v.approverViewer}"><button type="button" class="btn btn-success mr-2" disabled>承認</button><button type="button" class="btn btn-warning mr-2" disabled>差戻し</button></c:if>
+          <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">メニューへ戻る</a>
         </c:if>
       </c:otherwise>
     </c:choose>

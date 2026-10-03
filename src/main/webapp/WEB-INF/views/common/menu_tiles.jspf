@@ -9,7 +9,7 @@
           <c:choose>
             <c:when test="${not t.enabled}">
               <p class="small text-muted mb-2"><c:out value="${t.note}"/></p>
-              <button type="button" class="btn btn-secondary btn-sm" disabled><c:out value="${t.title}"/></button>
+              <button type="button" class="btn btn-secondary btn-sm" disabled><c:out value="${t.buttonLabel}"/></button>
             </c:when>
             <c:when test="${t.post}">
               <form method="post" action="${ctx}${t.formAction}" ${not empty t.confirm ? 'data-confirm="'.concat(fn:escapeXml(t.confirm)).concat('"') : ''}>
@@ -18,11 +18,11 @@
                 <c:if test="${t.reasonInput}">
                   <textarea class="form-control form-control-sm mb-2" name="reason" rows="2" maxlength="500" placeholder="取消理由（任意）"></textarea>
                 </c:if>
-                <button type="submit" class="btn btn-${t.style} btn-sm"><c:out value="${t.title}"/></button>
+                <button type="submit" class="btn btn-${t.style} btn-sm"><c:out value="${t.buttonLabel}"/></button>
               </form>
             </c:when>
             <c:otherwise>
-              <a class="btn btn-${t.style} btn-sm" href="${ctx}${t.href}"><c:out value="${t.title}"/></a>
+              <a class="btn btn-${t.style} btn-sm" href="${ctx}${t.href}"><c:out value="${t.buttonLabel}"/></a>
             </c:otherwise>
           </c:choose>
         </div>
