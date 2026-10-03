@@ -9,7 +9,7 @@
           <span class="badge badge-${fn:endsWith(a.statusCd, '701') ? 'success' : a.statusCd == '90101' ? 'dark' : 'primary'} status-badge ml-2">${a.statusCd} <c:out value="${d.status.statusName}"/></span></h2>
         <div class="small text-muted"><c:out value="${d.status.description}"/></div>
         <div class="small mt-1">
-          <strong>申込者：</strong><c:out value="${d.applicant.applicantNo}"/>／<c:out value="${d.applicant.applicantName}"/>　
+          <strong>申込者：</strong><c:out value="${d.applicant.applicantName}"/>（<c:out value="${empty d.applicant.applicantNo ? 'アカウント未発行' : d.applicant.applicantNo}"/>）　
           <strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　
           <strong>会社区分：</strong><c:out value="${d.companyDiv.companyDivName}"/>　
           <strong>現行版：</strong>第 ${a.currentVersionNo} 版（<c:out value="${d.currentVersion.versionTypeName}"/>）　

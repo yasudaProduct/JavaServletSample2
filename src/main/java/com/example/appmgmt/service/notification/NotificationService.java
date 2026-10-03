@@ -2,12 +2,12 @@ package com.example.appmgmt.service.notification;
 
 import com.example.appmgmt.common.AppConfig;
 import com.example.appmgmt.common.Formats;
-import com.example.appmgmt.dao.ApplicantDao;
+import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.EmployeeDao;
 import com.example.appmgmt.dao.NotificationDao;
 import com.example.appmgmt.dao.StatusDao;
-import com.example.appmgmt.domain.Applicant;
 import com.example.appmgmt.domain.Application;
+import com.example.appmgmt.domain.ApplicationVersion;
 import com.example.appmgmt.domain.ApprovalRequest;
 import com.example.appmgmt.domain.Codes;
 import com.example.appmgmt.domain.Employee;
@@ -34,14 +34,14 @@ public class NotificationService {
 
     private final NotificationDao notificationDao;
     private final EmployeeDao employeeDao;
-    private final ApplicantDao applicantDao;
+    private final ApplicationVersionDao versionDao;
     private final StatusDao statusDao;
     private final Properties templates = new Properties();
 
-    public NotificationService(NotificationDao notificationDao, EmployeeDao employeeDao, ApplicantDao applicantDao, StatusDao statusDao) {
+    public NotificationService(NotificationDao notificationDao, EmployeeDao employeeDao, ApplicationVersionDao versionDao, StatusDao statusDao) {
         this.notificationDao = notificationDao;
         this.employeeDao = employeeDao;
-        this.applicantDao = applicantDao;
+        this.versionDao = versionDao;
         this.statusDao = statusDao;
         try (InputStream in = NotificationService.class.getClassLoader().getResourceAsStream("notification-templates.properties")) {
             if (in != null) {
@@ -52,10 +52,10 @@ public class NotificationService {
         }
     }
 
-    /** 共通プレースホルダ（申込番号、申込者名、担当者名、申込詳細 URL、ステータス名）。 */
+    /** 共通プレースホルダ（申込番号、申込者名、担当者名、申込詳細 URL、ステータス名）。申込者名・メールアドレスは申込データ（現行版）から取る。 */
     private Map<String, String> baseParams(Connection conn, Application app) {
         Map<String, String> p = new HashMap<>();
-        Applicant applicant = applicantDao.findById(conn, app.getApplicantId()).orElse(null);
+        ApplicationVersion applicant = versionDao.find(conn, app.getApplicationId(), app.getCurrentVersionNo()).orElse(null);
         Employee owner = employeeDao.findById(conn, app.getOwnerEmployeeId()).orElse(null);
         Status status = statusDao.find(conn, app.getStatusCd()).orElse(null);
         p.put("applicationNo", app.getApplicationNo());

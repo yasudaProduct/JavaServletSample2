@@ -1,21 +1,32 @@
 package com.example.appmgmt.domain;
 
-import java.time.LocalDateTime;
-
-public class Applicant extends AuditedEntity {
-    private long applicantId;
+/**
+ * 申込者情報（表示用の値）。申込者名・カナ・電話番号・メールアドレス・住所は申込データ（申込内容の版）が持ち、
+ * ユーザー ID（申込者番号）は申込者アカウントが持つ。両者をまとめて画面・通知・電文で使う。テーブルには対応しない。
+ */
+public class Applicant {
     private String applicantNo;
     private String applicantName;
     private String applicantKana;
     private String mailAddress;
     private String telNo;
     private String address;
-    private String passwordHash;
-    private LocalDateTime accountIssuedAt;
-    private LocalDateTime passwordChangedAt;
 
-    public long getApplicantId() { return applicantId; }
-    public void setApplicantId(long applicantId) { this.applicantId = applicantId; }
+    /** 版の申込者情報と、申込者アカウント（未発行なら null）から組み立てる。 */
+    public static Applicant of(ApplicationVersion v, ApplicantAccount account) {
+        Applicant a = new Applicant();
+        if (v != null) {
+            a.applicantName = v.getApplicantName();
+            a.applicantKana = v.getApplicantKana();
+            a.mailAddress = v.getMailAddress();
+            a.telNo = v.getTelNo();
+            a.address = v.getAddress();
+        }
+        a.applicantNo = account == null ? null : account.getApplicantNo();
+        return a;
+    }
+
+    /** 申込者番号（申込者ページのユーザー ID）。アカウント未発行なら null。 */
     public String getApplicantNo() { return applicantNo; }
     public void setApplicantNo(String applicantNo) { this.applicantNo = applicantNo; }
     public String getApplicantName() { return applicantName; }
@@ -28,12 +39,6 @@ public class Applicant extends AuditedEntity {
     public void setTelNo(String telNo) { this.telNo = telNo; }
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
-    public LocalDateTime getAccountIssuedAt() { return accountIssuedAt; }
-    public void setAccountIssuedAt(LocalDateTime accountIssuedAt) { this.accountIssuedAt = accountIssuedAt; }
-    public LocalDateTime getPasswordChangedAt() { return passwordChangedAt; }
-    public void setPasswordChangedAt(LocalDateTime passwordChangedAt) { this.passwordChangedAt = passwordChangedAt; }
-    /** 申込者ページのアカウントが発行済みか。ログイン ID は申込者番号。 */
-    public boolean isAccountIssued() { return passwordHash != null; }
+    /** 申込者アカウントが発行済みか。 */
+    public boolean isAccountIssued() { return applicantNo != null; }
 }

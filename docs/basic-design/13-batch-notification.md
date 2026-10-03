@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.2（ステータス体系の改定を反映） |
+| 版 | 0.3（申込者宛の通知の宛先・差込項目を申込データ（現行版）から取る） |
 | 関連 | [01. システム概要](01-overview.md)（設計方針 6）、[02. システム構成](02-system-architecture.md)、[03. ステータス定義・状態遷移](03-status-transition.md)、[07. テーブル定義](07-table-definition.md)、[08. コード定義](08-code-definition.md)、[09. 機能一覧](09-function-list.md)、[10. 機能詳細](10-function-detail.md)、[11. 画面設計](11-screen-design.md)、[12. 外部インターフェース設計](12-external-interface.md)、[14. 共通仕様](14-common-spec.md)、[99. 未決事項](99-open-issues.md) |
 | 前提 | バッチの実行基盤・再送ポリシー・メール文面は仮置き（[99. 未決事項](99-open-issues.md) No.15、24、25）。確定後に本書を更新する |
 
@@ -94,17 +94,17 @@
 
 | 種別 | 名称 | 登録契機（遷移 ID） | 登録者 | 宛先の決定ルール |
 | --- | --- | --- | --- | --- |
-| 01 | 申込者確認依頼 | 遷移先が内容確認待ち（10301／20301）：遷移 ID 6（10201 申請・回付先なし）、8（10202 最終承認者の承認）、35（20201 申請・回付先なし）、37（20202 最終承認者の承認）。および SC14「確認依頼メール再送」（10301／10302／20301／20302、[F06 7.3](10-function-detail.md#73-再送)） | F14（F06） | 申込の申込者（T_APPLICATION.APPLICANT_ID）→ M_APPLICANT.MAIL_ADDRESS |
+| 01 | 申込者確認依頼 | 遷移先が内容確認待ち（10301／20301）：遷移 ID 6（10201 申請・回付先なし）、8（10202 最終承認者の承認）、35（20201 申請・回付先なし）、37（20202 最終承認者の承認）。および SC14「確認依頼メール再送」（10301／10302／20301／20302、[F06 7.3](10-function-detail.md#73-再送)） | F14（F06） | 申込の申込者 → 現行版の T_APPLICATION_VERSION.MAIL_ADDRESS（申込データ） |
 | 02 | 承認依頼 | 申請で申請中へ：遷移 ID 5（10201 → 10202）、21（10501 → 10502）、34（20201 → 20202）、49（20501 → 20502）。最終承認者以外の承認（ステータス遷移なし。F14 は呼ばれず [F05 6.2](10-function-detail.md#62-承認の処理手順) が登録する） | F14／F05 | 承認申請の現在ステップ（T_APPROVAL_REQUEST.CURRENT_STEP_NO）の承認明細の承認者（T_APPROVAL_STEP.APPROVER_EMPLOYEE_ID）→ M_EMPLOYEE.MAIL_ADDRESS。申請時はステップ 1、承認時は +1 した後のステップ |
 | 03 | 差戻し通知 | 承認者の差戻し：遷移 ID 7（10202 → 10201）、25（10502 → 10501）、36（20202 → 20201）、50（20502 → 20501） | F14 | 承認申請の申請社員（T_APPROVAL_REQUEST.REQUEST_EMPLOYEE_ID）→ M_EMPLOYEE.MAIL_ADDRESS |
 | 04 | 申込者差戻し通知 | 申込者差戻し：遷移 ID 12（10302 → 10201）、41（20302 → 20201） | F14 | 申込の担当社員（T_APPLICATION.OWNER_EMPLOYEE_ID）→ M_EMPLOYEE.MAIL_ADDRESS |
 | 05 | 事前確認結果通知 | 事前確認「修正必要」の受信（操作コード 11）：遷移 ID 17（10401 → 10402）、45（20401 → 20402） | F14 | 同上 |
 | 06 | 審査結果通知 | 審査完了の受信（操作コード 12）：遷移 ID 27（10601 → 10701）、52（20601 → 20701）。審査差戻しの受信（操作コード 13）：遷移 ID 28（10601 → 10501）、53（20601 → 10701）、54（20601 → 20701） | F14 | 同上 |
 | 07 | 送信エラー通知 | 外部連携の送信エラー確定（5.4 節）。ステータス遷移は伴わない | BT02 | 申込の担当社員、および権限 09（管理者）で有効（VALID_FLG = 1）な全社員。宛先 1 件につき通知 1 行を登録し、重複する宛先は 1 行にまとめる |
-| 08 | 申込者アカウント通知 | 内容確認待ち（10301／20301）への到達時に申込者のアカウントが未発行のとき（遷移 ID 6、8、35、37。[10. F17](10-function-detail.md#17-f17-申込者アカウント申込者ポータル)） | F14（F17） | 申込の申込者 → M_APPLICANT.MAIL_ADDRESS |
-| 09 | パスワード初期化通知 | SC15 メンテナンスで担当者・管理者がパスワードを初期化したとき（[10. F17 17.4](10-function-detail.md#174-パスワードの初期化sc15)） | SC15（F17） | 申込の申込者 → M_APPLICANT.MAIL_ADDRESS |
+| 08 | 申込者アカウント通知 | 内容確認待ち（10301／20301）への到達時に、申込がまだ申込者アカウントに紐づいていないとき（アカウントを発行して紐づける。遷移 ID 6、8、35、37。[10. F17](10-function-detail.md#17-f17-申込者アカウント申込者ポータル)） | F14（F17） | 申込の申込者 → 現行版の T_APPLICATION_VERSION.MAIL_ADDRESS |
+| 09 | パスワード初期化通知 | SC15 メンテナンスで担当者・管理者がパスワードを初期化したとき（[10. F17 17.4](10-function-detail.md#174-パスワードの初期化sc15)） | SC15（F17） | SC15 で開いた申込の申込者 → その申込の現行版の T_APPLICATION_VERSION.MAIL_ADDRESS |
 
-- 宛先は登録時点のアドレスを TO_ADDRESS に保持し、その後のマスタ変更は反映しない（[07. T_NOTIFICATION](07-table-definition.md#416-通知t_notification)）。
+- 宛先は登録時点のアドレスを TO_ADDRESS に保持し、その後のマスタ変更や申込内容の修正（申込者のメールアドレスの変更）は反映しない（[07. T_NOTIFICATION](07-table-definition.md#416-通知t_notification)）。
 - 通知を登録しない遷移：担当者の確定・修正（1〜4、18〜20、22〜24、30〜33、46〜48）、申込者の確定（10、39）、申込者の修正で内容確認待ちへ戻る 13（同じ申込者同意で継続するため通知 01 は再送しない）、引戻し（9、11、38、40）、同意（14、15、42、43）、事前確認「問題なし」（16、44）、審査申請（26、51）、契約変更開始（29、55）。
 - 事前確認「問題なし」と審査申請はメールを送らず、担当者・承認者は SC02 の「自分の操作待ち」で把握する（仮）。
 - 通知の送信エラー（BT01）は通知 07 の対象外とし、ログと監視で対応する（4.4 節、6 章）。
@@ -115,7 +115,7 @@
 
 | プレースホルダ | 内容 | 取得元 |
 | --- | --- | --- |
-| ${applicationNo}／${applicantName}／${ownerName} | 申込番号／申込者名／担当社員名 | T_APPLICATION.APPLICATION_NO、M_APPLICANT.APPLICANT_NAME、M_EMPLOYEE.EMPLOYEE_NAME（担当社員） |
+| ${applicationNo}／${applicantName}／${ownerName} | 申込番号／申込者名／担当社員名 | T_APPLICATION.APPLICATION_NO、T_APPLICATION_VERSION.APPLICANT_NAME（現行版）、M_EMPLOYEE.EMPLOYEE_NAME（担当社員） |
 | ${approverName}／${requesterName} | 承認者名／申請社員名 | M_EMPLOYEE.EMPLOYEE_NAME（通知 02 は宛先の承認者、03 は差し戻した承認者と承認申請の申請社員） |
 | ${approvalTypeName}／${stepNo}／${finalStepNo} | 承認種別名／宛先のステップ番号／最終ステップ | [08. 9 章](08-code-definition.md#9-承認種別approval_type)、T_APPROVAL_REQUEST.CURRENT_STEP_NO、FINAL_STEP_NO |
 | ${statusName} | 遷移後（通知 07 は現在）のステータスの申込受付会社向け表示名 | M_STATUS.STATUS_NAME |
@@ -403,7 +403,7 @@ flowchart TB
 3. 取得件数が 0 なら終了する。
 4. 取得した行を順に処理する。
    1. 申込（T_APPLICATION）を取得し、外部連携の VERSION_NO と CURRENT_VERSION_NO を比較する。一致しなければ送信せず、SEND_STATUS = 2、ERROR_MESSAGE = 「版が更新されたため送信中止」で更新してコミットし、次の行へ進む（5.5 節）。
-   2. 対象版の申込内容（T_APPLICATION_VERSION）、申込者（M_APPLICANT）、比較元の版（連携種別 1／3 は基準版 T_APPLICATION.BASE_VERSION_NO、4 は審査完了版 REVIEWED_VERSION_NO。2 は不要）を取得し、連携種別に応じて IF01 または IF03 の電文を組み立てる（[12. 3.2 節](12-external-interface.md#32-リクエスト項目)）。requestId に外部連携 ID を入れる。
+   2. 対象版の申込内容（T_APPLICATION_VERSION。申込者情報を含む）、申込者アカウント（M_APPLICANT_ACCOUNT。申込者番号）、比較元の版（連携種別 1／3 は基準版 T_APPLICATION.BASE_VERSION_NO、4 は審査完了版 REVIEWED_VERSION_NO。2 は不要）を取得し、連携種別に応じて IF01 または IF03 の電文を組み立てる（[12. 3.2 節](12-external-interface.md#32-リクエスト項目)）。requestId に外部連携 ID を入れる。
    3. `X-API-Key` ヘッダを付けて HTTPS で POST する（接続 5 秒、読取 30 秒、仮）。
    4. 応答に応じて行を更新し、必要なら通知 07 を登録してコミットする（5.4 節）。
    5. 接続エラー・タイムアウトが連続 5 回（仮）に達したら、残りの行を処理せずに 5 へ進む。停止要求があった場合も同じ。

@@ -50,15 +50,6 @@
     });
   }
 
-  // SC04 申込者：新規の申込者／登録済みの申込者の切り替え
-  document.querySelectorAll('input[name=applicantMode]').forEach(function (r) {
-    r.addEventListener('change', function () {
-      var isNew = document.getElementById('applicantModeNew').checked;
-      document.querySelectorAll('.applicant-new').forEach(function (el) { el.style.display = isNew ? '' : 'none'; });
-      document.querySelectorAll('.applicant-existing').forEach(function (el) { el.style.display = isNew ? 'none' : ''; });
-    });
-  });
-
   // 確認ダイアログ
   document.querySelectorAll('form[data-confirm]').forEach(function (f) {
     f.addEventListener('submit', function (e) {

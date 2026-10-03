@@ -6,7 +6,7 @@
 <script>document.body.setAttribute('data-base-total', '${empty base ? '' : base.totalAmount}'); document.body.setAttribute('data-ratio-limit', '${ratioLimit}');</script>
 <div class="card mb-3"><div class="card-body py-2 small">
   <strong>申込番号：</strong><c:out value="${a.applicationNo}"/>　<strong>ステータス：</strong><c:out value="${d.status.displayName}"/>　<strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　
-  <strong>申込者：</strong><c:out value="${d.applicant.applicantNo}"/>／<c:out value="${d.applicant.applicantName}"/><br>
+  <strong>申込者：</strong><c:out value="${d.applicant.applicantName}"/>（<c:out value="${empty d.applicant.applicantNo ? 'アカウント未発行' : d.applicant.applicantNo}"/>）<br>
   <strong>現行版：</strong>第 ${d.currentVersion.versionNo} 版（<c:out value="${d.currentVersion.versionTypeName}"/>）　確定時に <strong>第 ${newVersionNo} 版</strong> を作成します。
   <c:if test="${amountsOnly}">　<span class="text-info">最終承認申請待ちの修正は金額項目のみ変更できます（他の項目は全体修正で変更します）。</span></c:if>
 </div></div>

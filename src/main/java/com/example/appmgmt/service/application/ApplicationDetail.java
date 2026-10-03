@@ -19,6 +19,7 @@ import java.util.Set;
 public class ApplicationDetail {
     private Application application;
     private Applicant applicant;
+    private com.example.appmgmt.domain.ApplicantAccount account;
     private Employee owner;
     private Status status;
     private CompanyDiv companyDiv;
@@ -37,8 +38,12 @@ public class ApplicationDetail {
 
     public Application getApplication() { return application; }
     public void setApplication(Application application) { this.application = application; }
+    /** 申込者情報（現行版の申込データ＋申込者アカウントのユーザー ID）。 */
     public Applicant getApplicant() { return applicant; }
     public void setApplicant(Applicant applicant) { this.applicant = applicant; }
+    /** 申込者アカウント（ログイン用のデータ）。一次承認で発行するまで null。 */
+    public com.example.appmgmt.domain.ApplicantAccount getAccount() { return account; }
+    public void setAccount(com.example.appmgmt.domain.ApplicantAccount account) { this.account = account; }
     public Employee getOwner() { return owner; }
     public void setOwner(Employee owner) { this.owner = owner; }
     public Status getStatus() { return status; }

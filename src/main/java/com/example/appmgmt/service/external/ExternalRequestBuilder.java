@@ -1,9 +1,10 @@
 package com.example.appmgmt.service.external;
 
-import com.example.appmgmt.dao.ApplicantDao;
+import com.example.appmgmt.dao.ApplicantAccountDao;
 import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.domain.Applicant;
+import com.example.appmgmt.domain.ApplicantAccount;
 import com.example.appmgmt.domain.Application;
 import com.example.appmgmt.domain.ApplicationVersion;
 import com.example.appmgmt.domain.Codes;
@@ -20,18 +21,20 @@ public class ExternalRequestBuilder {
 
     private final ApplicationDao applicationDao;
     private final ApplicationVersionDao versionDao;
-    private final ApplicantDao applicantDao;
+    private final ApplicantAccountDao accountDao;
 
-    public ExternalRequestBuilder(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantDao applicantDao) {
+    public ExternalRequestBuilder(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantAccountDao accountDao) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
-        this.applicantDao = applicantDao;
+        this.accountDao = accountDao;
     }
 
     public Map<String, Object> build(Connection conn, ExternalLink link) {
         Application app = applicationDao.findById(conn, link.getApplicationId()).orElseThrow();
         ApplicationVersion v = versionDao.get(conn, app.getApplicationId(), link.getVersionNo());
-        Applicant ap = applicantDao.findById(conn, app.getApplicantId()).orElseThrow();
+        // 申込者情報は送信する版（申込データ）から、申込者番号は申込者アカウント（未発行なら null）から取る
+        ApplicantAccount account = app.getApplicantId() == null ? null : accountDao.findById(conn, app.getApplicantId()).orElse(null);
+        Applicant ap = Applicant.of(v, account);
         boolean precheck = link.isPrecheck();
         boolean changeReview = Codes.LINK_CHANGE_REVIEW.equals(link.getLinkType());
 

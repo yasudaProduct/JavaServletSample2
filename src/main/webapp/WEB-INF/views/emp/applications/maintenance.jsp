@@ -4,28 +4,17 @@
 <%@ include file="/WEB-INF/views/common/emp_top.jspf" %>
 <div class="card mb-3"><div class="card-body py-2 small">
   <strong>申込番号：</strong><c:out value="${a.applicationNo}"/>　<strong>ステータス：</strong><c:out value="${d.status.displayName}"/>　<strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　
-  <strong>申込者：</strong><c:out value="${ap.applicantNo}"/>／<c:out value="${ap.applicantName}"/>　<strong>メールアドレス：</strong><c:out value="${ap.mailAddress}"/>
+  <strong>申込者：</strong><c:out value="${ap.applicantName}"/>（<c:out value="${empty ap.applicantNo ? 'アカウント未発行' : ap.applicantNo}"/>）　<strong>メールアドレス：</strong><c:out value="${ap.mailAddress}"/>
 </div></div>
-<h3 class="h6 section-title">申込者情報の変更</h3>
-<div class="card mb-3" id="applicantProfileCard"><div class="card-body pb-1">
-  <p class="small text-muted mb-2">申込者番号 <strong><c:out value="${ap.applicantNo}"/></strong>（申込者ページのユーザー ID。変更できません）。
-    この申込者は ${applicationCount} 件の申込で使われています${applicationCount > 1 ? '。変更はすべての申込に反映されます' : ''}。
-    <c:if test="${consenting}"><br><span class="text-warning">申込者の確認中です。メールアドレスを変えた場合は「確認依頼メール再送」で新しいアドレスへ送り直してください。</span></c:if></p>
-  <form method="post" action="${ctx}/emp/applications/${a.applicationId}/maintenance/updateApplicant">
-    <input type="hidden" name="_csrf" value="${csrf}">
-    <input type="hidden" name="applicantRowVersion" value="${ap.rowVersion}">
-    <%@ include file="/WEB-INF/views/common/applicant_fields.jspf" %>
-    <button type="submit" class="btn btn-primary mb-3" id="updateApplicantBtn">申込者情報を変更する</button>
-  </form>
-</div></div>
+<p class="small text-muted">申込者名・メールアドレスなどの申込者情報は申込データです。変更は申込内容の入力・修正（全体修正、契約変更）で行います。ここでは申込者ページへのログインに必要なデータ（申込者アカウント）を扱います。</p>
 <div class="row">
   <div class="col-lg-5">
-    <h3 class="h6 section-title">申込者アカウント（申込者ページ）</h3>
-    <table class="table table-sm table-bordered">
-      <tr><th style="width: 40%;">ユーザー ID</th><td><c:out value="${ap.applicantNo}"/></td></tr>
-      <tr><th>アカウント</th><td>${ap.accountIssued ? '発行済み' : '未発行（一次承認が通って申込内容確認待ちになったときに発行）'}</td></tr>
-      <tr><th>発行日時</th><td>${app:datetime(ap.accountIssuedAt)}</td></tr>
-      <tr><th>パスワード変更日時</th><td>${empty ap.passwordChangedAt ? (ap.accountIssued ? '（初期パスワードのまま）' : '－') : app:datetime(ap.passwordChangedAt)}</td></tr>
+    <h3 class="h6 section-title">申込者アカウント（ログイン用のデータ）</h3>
+    <table class="table table-sm table-bordered" id="accountTable">
+      <tr><th style="width: 40%;">ユーザー ID</th><td><c:out value="${empty account ? '－' : account.applicantNo}"/></td></tr>
+      <tr><th>アカウント</th><td>${empty account ? '未発行（一次承認が通って申込内容確認待ちになったときに発行）' : '発行済み'}</td></tr>
+      <tr><th>発行日時</th><td>${empty account ? '－' : app:datetime(account.accountIssuedAt)}</td></tr>
+      <tr><th>パスワード変更日時</th><td>${empty account ? '－' : (account.initialPassword ? '（初期パスワードのまま）' : app:datetime(account.passwordChangedAt))}</td></tr>
     </table>
     <form method="post" action="${ctx}/emp/applications/${a.applicationId}/maintenance/resetPassword" data-confirm="申込者ページのパスワードを初期化します。現在のパスワードは使えなくなり、新しい初期パスワードを申込者へメールで通知します。よろしいですか？">
       <input type="hidden" name="_csrf" value="${csrf}">

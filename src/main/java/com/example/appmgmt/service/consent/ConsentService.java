@@ -6,10 +6,12 @@ import com.example.appmgmt.common.TokenUtil;
 import com.example.appmgmt.common.TransitionNotAllowedException;
 import com.example.appmgmt.common.Tx;
 import com.example.appmgmt.dao.ApplicantConsentDao;
-import com.example.appmgmt.dao.ApplicantDao;
+import com.example.appmgmt.dao.ApplicantAccountDao;
 import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.StatusDao;
+import com.example.appmgmt.domain.Applicant;
+import com.example.appmgmt.domain.ApplicantAccount;
 import com.example.appmgmt.domain.ApplicantConsent;
 import com.example.appmgmt.domain.Application;
 import com.example.appmgmt.domain.ApplicationVersion;
@@ -37,16 +39,16 @@ public class ConsentService {
     private final ApplicantConsentDao consentDao;
     private final ApplicationDao applicationDao;
     private final ApplicationVersionDao versionDao;
-    private final ApplicantDao applicantDao;
+    private final ApplicantAccountDao accountDao;
     private final StatusDao statusDao;
     private final StatusTransitionService transitionService;
 
-    public ConsentService(ApplicantConsentDao consentDao, ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantDao applicantDao, StatusDao statusDao,
+    public ConsentService(ApplicantConsentDao consentDao, ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantAccountDao accountDao, StatusDao statusDao,
                           StatusTransitionService transitionService) {
         this.consentDao = consentDao;
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
-        this.applicantDao = applicantDao;
+        this.accountDao = accountDao;
         this.statusDao = statusDao;
         this.transitionService = transitionService;
     }
@@ -66,7 +68,7 @@ public class ConsentService {
     public Resolver byApplicant(long applicantId, long applicationId) {
         return conn -> {
             Application app = applicationDao.findById(conn, applicationId).orElse(null);
-            if (app == null || app.getApplicantId() != applicantId) {
+            if (app == null || app.getApplicantId() == null || app.getApplicantId() != applicantId) {
                 throw new ForbiddenException();
             }
             ApplicantConsent c = consentDao.findActive(conn, applicationId).orElse(null);
@@ -74,14 +76,20 @@ public class ConsentService {
                 // 進行中の同意がない：完了扱い（申込者確認中でなければお手続きなし）
                 ConsentView v = new ConsentView();
                 v.setApplication(app);
-                v.setApplicant(applicantDao.findById(conn, app.getApplicantId()).orElse(null));
                 v.setStatus(statusDao.find(conn, app.getStatusCd()).orElse(null));
                 v.setVersion(versionDao.find(conn, app.getApplicationId(), app.getCurrentVersionNo()).orElse(null));
+                v.setApplicant(applicantOf(conn, app, v.getVersion()));
                 v.setOutcome(ConsentView.Outcome.COMPLETED);
                 return v;
             }
             return build(conn, c, app);
         };
+    }
+
+    /** 申込者情報（確認対象の版の申込データ）と、申込者アカウントのユーザー ID をまとめる。 */
+    private Applicant applicantOf(Connection conn, Application app, ApplicationVersion version) {
+        ApplicantAccount account = app.getApplicantId() == null ? null : accountDao.findById(conn, app.getApplicantId()).orElse(null);
+        return Applicant.of(version, account);
     }
 
     private static ConsentView invalid() {
@@ -99,9 +107,9 @@ public class ConsentService {
             return v;
         }
         v.setApplication(app);
-        v.setApplicant(applicantDao.findById(conn, app.getApplicantId()).orElse(null));
         v.setStatus(statusDao.find(conn, app.getStatusCd()).orElse(null));
         v.setVersion(versionDao.find(conn, app.getApplicationId(), c.getVersionNo()).orElse(null));
+        v.setApplicant(applicantOf(conn, app, v.getVersion()));
         if (v.isContractChange() && app.getReviewedVersionNo() != null) {
             v.setBeforeVersion(versionDao.find(conn, app.getApplicationId(), app.getReviewedVersionNo()).orElse(null));
         }
@@ -152,14 +160,9 @@ public class ConsentService {
             if (!StatusCd.CONFIRM_WAIT.equals(v.getApplication().getStatusCd())) {
                 throw new TransitionNotAllowedException();
             }
+            // 申込者は自分の申込者情報（連絡先）も申込内容として修正できる
             ApplicationVersion cur = v.getVersion();
-            cur.setProductCd(content.getProductCd());
-            cur.setBasicFee(content.getBasicFee());
-            cur.setOptionFee(content.getOptionFee());
-            cur.setHandlingFee(content.getHandlingFee());
-            cur.setContractStartDate(content.getContractStartDate());
-            cur.setContractEndDate(content.getContractEndDate());
-            cur.setRemarks(content.getRemarks());
+            cur.applyContentFrom(content);
             versionDao.updateContent(conn, cur);
             applicationDao.touch(conn, cur.getApplicationId(), v.getApplication().getRowVersion());
         });

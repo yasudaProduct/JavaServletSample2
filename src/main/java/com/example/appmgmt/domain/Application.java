@@ -5,7 +5,8 @@ import java.time.LocalDateTime;
 public class Application extends AuditedEntity {
     private long applicationId;
     private String applicationNo;
-    private long applicantId;
+    /** 申込者アカウント ID。一次承認が通ってアカウントを発行（または既存のアカウントを指定）するまでは null。 */
+    private Long applicantId;
     private long ownerEmployeeId;
     private String companyDiv;
     private String deptCd;
@@ -22,8 +23,8 @@ public class Application extends AuditedEntity {
     public void setApplicationId(long applicationId) { this.applicationId = applicationId; }
     public String getApplicationNo() { return applicationNo; }
     public void setApplicationNo(String applicationNo) { this.applicationNo = applicationNo; }
-    public long getApplicantId() { return applicantId; }
-    public void setApplicantId(long applicantId) { this.applicantId = applicantId; }
+    public Long getApplicantId() { return applicantId; }
+    public void setApplicantId(Long applicantId) { this.applicantId = applicantId; }
     public long getOwnerEmployeeId() { return ownerEmployeeId; }
     public void setOwnerEmployeeId(long ownerEmployeeId) { this.ownerEmployeeId = ownerEmployeeId; }
     public String getCompanyDiv() { return companyDiv; }

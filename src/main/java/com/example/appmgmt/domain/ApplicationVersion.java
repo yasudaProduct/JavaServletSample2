@@ -10,6 +10,12 @@ public class ApplicationVersion extends AuditedEntity {
     private int versionNo;
     private String versionType;
     private Integer copiedFromVersionNo;
+    // 申込者情報（申込データの一部。版ごとに持ち、全体修正・契約変更・申込者の修正で変わる）
+    private String applicantName;
+    private String applicantKana;
+    private String telNo;
+    private String mailAddress;
+    private String address;
     private String productCd;
     private BigDecimal basicFee;
     private BigDecimal optionFee;
@@ -31,6 +37,16 @@ public class ApplicationVersion extends AuditedEntity {
     public void setVersionType(String versionType) { this.versionType = versionType; }
     public Integer getCopiedFromVersionNo() { return copiedFromVersionNo; }
     public void setCopiedFromVersionNo(Integer copiedFromVersionNo) { this.copiedFromVersionNo = copiedFromVersionNo; }
+    public String getApplicantName() { return applicantName; }
+    public void setApplicantName(String applicantName) { this.applicantName = applicantName; }
+    public String getApplicantKana() { return applicantKana; }
+    public void setApplicantKana(String applicantKana) { this.applicantKana = applicantKana; }
+    public String getTelNo() { return telNo; }
+    public void setTelNo(String telNo) { this.telNo = telNo; }
+    public String getMailAddress() { return mailAddress; }
+    public void setMailAddress(String mailAddress) { this.mailAddress = mailAddress; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
     public String getProductCd() { return productCd; }
     public void setProductCd(String productCd) { this.productCd = productCd; }
     public BigDecimal getBasicFee() { return basicFee; }
@@ -67,9 +83,10 @@ public class ApplicationVersion extends AuditedEntity {
         this.totalAmount = b.add(o).add(h);
     }
 
-    /** 申込内容（商品・金額・契約期間・備考）が同じか。 */
+    /** 申込内容（申込者情報・商品・金額・契約期間・備考）が同じか。 */
     public boolean sameContentAs(ApplicationVersion other) {
         return other != null
+                && sameApplicantAs(other)
                 && Objects.equals(productCd, other.productCd)
                 && cmp(basicFee, other.basicFee)
                 && cmp(optionFee, other.optionFee)
@@ -77,6 +94,16 @@ public class ApplicationVersion extends AuditedEntity {
                 && Objects.equals(contractStartDate, other.contractStartDate)
                 && Objects.equals(contractEndDate, other.contractEndDate)
                 && Objects.equals(normalize(remarks), normalize(other.remarks));
+    }
+
+    /** 申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）が同じか。 */
+    public boolean sameApplicantAs(ApplicationVersion other) {
+        return other != null
+                && Objects.equals(normalize(applicantName), normalize(other.applicantName))
+                && Objects.equals(normalize(applicantKana), normalize(other.applicantKana))
+                && Objects.equals(normalize(telNo), normalize(other.telNo))
+                && Objects.equals(normalize(mailAddress), normalize(other.mailAddress))
+                && Objects.equals(normalize(address), normalize(other.address));
     }
 
     /** 金額項目だけが同じか。 */
@@ -95,8 +122,30 @@ public class ApplicationVersion extends AuditedEntity {
         return s == null || s.isEmpty() ? null : s.replace("\r\n", "\n");
     }
 
+    /** 入力された申込内容（申込者情報を含む）をこの版へ写す。版番号・版種別・確定状態などは変えない。 */
+    public void applyContentFrom(ApplicationVersion content) {
+        applicantName = content.applicantName;
+        applicantKana = content.applicantKana;
+        telNo = content.telNo;
+        mailAddress = content.mailAddress;
+        address = content.address;
+        productCd = content.productCd;
+        basicFee = content.basicFee;
+        optionFee = content.optionFee;
+        handlingFee = content.handlingFee;
+        contractStartDate = content.contractStartDate;
+        contractEndDate = content.contractEndDate;
+        remarks = content.remarks;
+        recalcTotal();
+    }
+
     public ApplicationVersion copyContent() {
         ApplicationVersion v = new ApplicationVersion();
+        v.applicantName = applicantName;
+        v.applicantKana = applicantKana;
+        v.telNo = telNo;
+        v.mailAddress = mailAddress;
+        v.address = address;
         v.productCd = productCd;
         v.basicFee = basicFee;
         v.optionFee = optionFee;

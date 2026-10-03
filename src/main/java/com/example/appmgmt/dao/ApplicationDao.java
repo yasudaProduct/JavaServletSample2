@@ -21,7 +21,7 @@ public class ApplicationDao extends AbstractDao {
         Application a = new Application();
         a.setApplicationId(rs.getLong("APPLICATION_ID"));
         a.setApplicationNo(rs.getString("APPLICATION_NO"));
-        a.setApplicantId(rs.getLong("APPLICANT_ID"));
+        a.setApplicantId(longObj(rs, "APPLICANT_ID"));
         a.setOwnerEmployeeId(rs.getLong("OWNER_EMPLOYEE_ID"));
         a.setCompanyDiv(rs.getString("COMPANY_DIV"));
         a.setDeptCd(rs.getString("DEPT_CD"));
@@ -41,9 +41,44 @@ public class ApplicationDao extends AbstractDao {
         return queryOne(conn, SELECT + " WHERE APPLICATION_ID = ?", ApplicationDao::map, applicationId);
     }
 
-    /** 申込者の申込一覧（更新日時の降順）。申込者ポータルで使う。 */
+    /** 申込者アカウントに紐づく申込の一覧（更新日時の降順）。申込者ポータルで使う。 */
     public List<Application> findByApplicant(Connection conn, long applicantId) {
         return query(conn, SELECT + " WHERE APPLICANT_ID = ? ORDER BY UPDATED_AT DESC, APPLICATION_ID DESC", ApplicationDao::map, applicantId);
+    }
+
+    /** 申込に申込者アカウントを紐づける（F14 後続処理・申込入力の同一トランザクション内の付随更新。行バージョンは進めない）。 */
+    public void linkAccount(Connection conn, long applicationId, long applicantId) {
+        update(conn, "UPDATE T_APPLICATION SET APPLICANT_ID = ?, UPDATED_AT = ?, UPDATED_BY = ? WHERE APPLICATION_ID = ?", applicantId, now(), actor(), applicationId);
+    }
+
+    /**
+     * 同じメールアドレス（現行版の申込者情報。大文字・小文字を区別しない）で申込者アカウントが発行済みの申込者。
+     * 重複の確認（W003）に使う。申込者番号ごとに 1 件（申込者名は最新の申込のもの）。
+     */
+    public List<com.example.appmgmt.domain.Applicant> findAccountHoldersByMail(Connection conn, String mailAddress, Long excludeApplicationId) {
+        List<com.example.appmgmt.domain.Applicant> rows = query(conn,
+                "SELECT p.APPLICANT_NO, v.APPLICANT_NAME, v.MAIL_ADDRESS FROM T_APPLICATION a JOIN M_APPLICANT_ACCOUNT p ON p.APPLICANT_ID = a.APPLICANT_ID "
+                        + "JOIN T_APPLICATION_VERSION v ON v.APPLICATION_ID = a.APPLICATION_ID AND v.VERSION_NO = a.CURRENT_VERSION_NO "
+                        + "WHERE LOWER(v.MAIL_ADDRESS) = LOWER(?) AND a.APPLICATION_ID <> ? ORDER BY p.APPLICANT_NO, a.UPDATED_AT DESC",
+                rs -> {
+                    com.example.appmgmt.domain.Applicant x = new com.example.appmgmt.domain.Applicant();
+                    x.setApplicantNo(rs.getString("APPLICANT_NO"));
+                    x.setApplicantName(rs.getString("APPLICANT_NAME"));
+                    x.setMailAddress(rs.getString("MAIL_ADDRESS"));
+                    return x;
+                }, mailAddress, excludeApplicationId == null ? -1L : excludeApplicationId);
+        java.util.Map<String, com.example.appmgmt.domain.Applicant> distinct = new java.util.LinkedHashMap<>();
+        for (com.example.appmgmt.domain.Applicant x : rows) {
+            distinct.putIfAbsent(x.getApplicantNo(), x);
+        }
+        return new ArrayList<>(distinct.values());
+    }
+
+    /** 申込者アカウントの最新の申込の申込者名（申込者ポータルの表示名）。 */
+    public String latestApplicantName(Connection conn, long applicantId) {
+        List<String> names = query(conn, "SELECT v.APPLICANT_NAME FROM T_APPLICATION a JOIN T_APPLICATION_VERSION v ON v.APPLICATION_ID = a.APPLICATION_ID AND v.VERSION_NO = a.CURRENT_VERSION_NO "
+                + "WHERE a.APPLICANT_ID = ? ORDER BY a.UPDATED_AT DESC, a.APPLICATION_ID DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY", rs -> rs.getString("APPLICANT_NAME"), applicantId);
+        return names.isEmpty() ? "" : names.get(0);
     }
 
     /** 申込番号を採番する（AP ＋ 10 桁ゼロ埋め）。 */
@@ -108,7 +143,8 @@ public class ApplicationDao extends AbstractDao {
         public int getPageSize() { return pageSize; }
     }
 
-    private static final String LIST_FROM = " FROM T_APPLICATION a JOIN M_APPLICANT p ON p.APPLICANT_ID = a.APPLICANT_ID JOIN M_EMPLOYEE e ON e.EMPLOYEE_ID = a.OWNER_EMPLOYEE_ID "
+    // 申込者名は申込データ（現行版）から、申込者番号は申込者アカウント（未発行なら NULL）から取る
+    private static final String LIST_FROM = " FROM T_APPLICATION a LEFT JOIN M_APPLICANT_ACCOUNT p ON p.APPLICANT_ID = a.APPLICANT_ID JOIN M_EMPLOYEE e ON e.EMPLOYEE_ID = a.OWNER_EMPLOYEE_ID "
             + "JOIN M_STATUS s ON s.STATUS_CD = a.STATUS_CD JOIN T_APPLICATION_VERSION v ON v.APPLICATION_ID = a.APPLICATION_ID AND v.VERSION_NO = a.CURRENT_VERSION_NO";
 
     private void buildWhere(Criteria c, StringBuilder sql, List<Object> params) {
@@ -118,7 +154,7 @@ public class ApplicationDao extends AbstractDao {
             params.add(escapeLike(c.applicationNo.trim()) + "%");
         }
         if (c.applicantKey != null && !c.applicantKey.isBlank()) {
-            sql.append(" AND (p.APPLICANT_NO = ? OR p.APPLICANT_NAME LIKE ?)");
+            sql.append(" AND (p.APPLICANT_NO = ? OR v.APPLICANT_NAME LIKE ?)");
             params.add(c.applicantKey.trim());
             params.add("%" + escapeLike(c.applicantKey.trim()) + "%");
         }
@@ -174,7 +210,7 @@ public class ApplicationDao extends AbstractDao {
     }
 
     public List<ApplicationListRow> search(Connection conn, Criteria c) {
-        StringBuilder sql = new StringBuilder("SELECT a.APPLICATION_ID, a.APPLICATION_NO, p.APPLICANT_NO, p.APPLICANT_NAME, a.STATUS_CD, s.STATUS_NAME, v.TOTAL_AMOUNT, e.EMPLOYEE_NAME, a.REGISTRATION_TYPE, a.UPDATED_AT")
+        StringBuilder sql = new StringBuilder("SELECT a.APPLICATION_ID, a.APPLICATION_NO, p.APPLICANT_NO, v.APPLICANT_NAME, a.STATUS_CD, s.STATUS_NAME, v.TOTAL_AMOUNT, e.EMPLOYEE_NAME, a.REGISTRATION_TYPE, a.UPDATED_AT")
                 .append(LIST_FROM);
         List<Object> params = new ArrayList<>();
         buildWhere(c, sql, params);
@@ -183,7 +219,7 @@ public class ApplicationDao extends AbstractDao {
             case "applicationNo": order = "a.APPLICATION_NO"; break;
             case "statusCd": order = "a.STATUS_CD"; break;
             case "totalAmount": order = "v.TOTAL_AMOUNT"; break;
-            case "applicantName": order = "p.APPLICANT_NAME"; break;
+            case "applicantName": order = "v.APPLICANT_NAME"; break;
             default: order = "a.UPDATED_AT"; break;
         }
         sql.append(" ORDER BY ").append(order).append(c.desc ? " DESC" : " ASC").append(", a.APPLICATION_ID DESC");

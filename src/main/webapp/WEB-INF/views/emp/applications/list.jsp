@@ -95,7 +95,7 @@
     <c:forEach var="r" items="${result.rows}">
       <tr>
         <td><a href="${ctx}/emp/applications/${r.applicationId}/menu"><c:out value="${r.applicationNo}"/></a></td>
-        <td><c:out value="${r.applicantNo}"/>／<c:out value="${r.applicantName}"/></td>
+        <td><c:out value="${app:text(r.applicantName)}"/><c:if test="${not empty r.applicantNo}"><br><small class="text-muted"><c:out value="${r.applicantNo}"/></small></c:if></td>
         <td><span class="badge badge-${fn:endsWith(r.statusCd, '701') ? 'success' : 'primary'} status-badge">${r.statusCd}</span> <c:out value="${r.statusName}"/></td>
         <td class="text-right">${app:amount(r.totalAmount)}</td>
         <td><c:out value="${r.ownerName}"/></td>

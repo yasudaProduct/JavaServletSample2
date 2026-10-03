@@ -6,12 +6,11 @@ import com.example.appmgmt.common.Formats;
 import com.example.appmgmt.common.OptimisticLockException;
 import com.example.appmgmt.common.TransitionNotAllowedException;
 import com.example.appmgmt.common.Tx;
-import com.example.appmgmt.dao.ApplicantDao;
+import com.example.appmgmt.dao.ApplicantAccountDao;
 import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.ExternalLinkDao;
 import com.example.appmgmt.dao.StatusHistoryDao;
-import com.example.appmgmt.domain.Applicant;
 import com.example.appmgmt.domain.Application;
 import com.example.appmgmt.domain.ApplicationVersion;
 import com.example.appmgmt.domain.Codes;
@@ -34,17 +33,17 @@ public class ApplicationService {
 
     private final ApplicationDao applicationDao;
     private final ApplicationVersionDao versionDao;
-    private final ApplicantDao applicantDao;
+    private final ApplicantAccountDao accountDao;
     private final StatusHistoryDao historyDao;
     private final ExternalLinkDao externalLinkDao;
     private final StatusTransitionService transitionService;
     private final ConsentIssuer consentIssuer;
 
-    public ApplicationService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantDao applicantDao, StatusHistoryDao historyDao,
+    public ApplicationService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantAccountDao accountDao, StatusHistoryDao historyDao,
                               ExternalLinkDao externalLinkDao, StatusTransitionService transitionService, ConsentIssuer consentIssuer) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
-        this.applicantDao = applicantDao;
+        this.accountDao = accountDao;
         this.historyDao = historyDao;
         this.externalLinkDao = externalLinkDao;
         this.transitionService = transitionService;
@@ -73,26 +72,28 @@ public class ApplicationService {
 
     /**
      * 新規申込（登録区分 2）または追加申込（登録区分 3）を作成する。ステータス 10101、第 1 版、履歴 00。
-     * newApplicant を渡すと、申込者を登録（申込者番号を採番）してから申込を作成する（F18。同一トランザクション）。
-     * newApplicant が null なら applicantNo の登録済み申込者を使う。
+     * 申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）は申込データとして第 1 版に持つ。
+     * 申込者アカウントは原則として一次承認が通ったときに発行して紐づける。同じ申込者の 2 件目以降は accountNo（発行済みのユーザー ID）を
+     * 指定して既存のアカウントに紐づけ、追加申込は元の申込のアカウントを引き継ぐ。
      */
-    public long create(LoginUser user, String applicantNo, Applicant newApplicant, ApplicationVersion content, Long sourceApplicationId) {
+    public long create(LoginUser user, String accountNo, ApplicationVersion content, Long sourceApplicationId) {
         if (!user.isOwner()) {
             throw new ForbiddenException();
         }
         return Tx.execute(conn -> {
-            Applicant applicant = newApplicant != null
-                    ? ApplicantService.register(conn, applicantDao, newApplicant)
-                    : applicantDao.findByNo(conn, applicantNo).orElseThrow(() -> new BusinessException("E009", "申込者番号"));
+            Long accountId = null;
             if (sourceApplicationId != null) {
                 Application src = applicationDao.findById(conn, sourceApplicationId).orElseThrow(ForbiddenException::new);
                 if (src.getOwnerEmployeeId() != user.getEmployeeId()) {
                     throw new ForbiddenException();
                 }
+                accountId = src.getApplicantId();
+            } else if (accountNo != null && !accountNo.isEmpty()) {
+                accountId = accountDao.findByNo(conn, accountNo).orElseThrow(() -> new BusinessException("E009", "申込者番号")).getApplicantId();
             }
             Application app = new Application();
             app.setApplicationNo(applicationDao.nextApplicationNo(conn));
-            app.setApplicantId(applicant.getApplicantId());
+            app.setApplicantId(accountId);
             app.setOwnerEmployeeId(user.getEmployeeId());
             app.setCompanyDiv(user.getCompanyDiv());
             app.setDeptCd(user.getDeptCd());
@@ -123,26 +124,20 @@ public class ApplicationService {
         });
     }
 
-    /** 一時保存（10101／20101）。現行版をそのまま更新する。遷移・履歴なし。 */
+    /** 一時保存（10101／20101）。現行版（申込者情報を含む申込内容）をそのまま更新する。遷移・履歴なし。 */
     public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, LoginUser user) {
         saveDraft(applicationId, rowVersion, content, null, user);
     }
 
     /**
-     * 一時保存。applicantProfile を渡すと申込者情報も更新する（申込者の関与前＝アカウント未発行で、この申込だけで使われている申込者に限る。F18）。
+     * 一時保存。申込者アカウントが未発行の申込で accountNo（発行済みのユーザー ID）を渡すと、そのアカウントに紐づける。
      */
-    public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, Applicant applicantProfile, LoginUser user) {
+    public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, String accountNo, LoginUser user) {
         Tx.executeVoid(conn -> {
             Application app = load(conn, applicationId, rowVersion, user, Set.of(StatusCd.INPUT, StatusCd.CHG_INPUT));
-            if (applicantProfile != null) {
-                Applicant current = applicantDao.findById(conn, app.getApplicantId()).orElseThrow(ForbiddenException::new);
-                if (current.isAccountIssued() || applicantDao.countApplications(conn, current.getApplicantId()) > 1) {
-                    throw new BusinessException("E118");
-                }
-                applicantProfile.setApplicantId(current.getApplicantId());
-                if (applicantDao.updateProfile(conn, applicantProfile, current.getRowVersion()) != 1) {
-                    throw new OptimisticLockException();
-                }
+            if (accountNo != null && !accountNo.isEmpty() && app.getApplicantId() == null) {
+                long accountId = accountDao.findByNo(conn, accountNo).orElseThrow(() -> new BusinessException("E009", "申込者番号")).getApplicantId();
+                applicationDao.linkAccount(conn, applicationId, accountId);
             }
             ApplicationVersion v = versionDao.get(conn, applicationId, app.getCurrentVersionNo());
             applyContent(v, content);
@@ -155,14 +150,7 @@ public class ApplicationService {
     }
 
     private static void applyContent(ApplicationVersion target, ApplicationVersion content) {
-        target.setProductCd(content.getProductCd());
-        target.setBasicFee(content.getBasicFee());
-        target.setOptionFee(content.getOptionFee());
-        target.setHandlingFee(content.getHandlingFee());
-        target.setContractStartDate(content.getContractStartDate());
-        target.setContractEndDate(content.getContractEndDate());
-        target.setRemarks(content.getRemarks());
-        target.recalcTotal();
+        target.applyContentFrom(content);
     }
 
     /** SC05 確定（10100／10101 → 10201）。確定日時を設定し F14 02。 */

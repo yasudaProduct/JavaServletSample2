@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.2（ステータス体系の改定を反映） |
+| 版 | 0.3（申込者情報を申込データ（版）から、申込者番号を申込者アカウントから組み立てる。IF05 の申込者列を申込データとして取り込む） |
 | 関連 | [01. システム概要](01-overview.md)、[03. ステータス定義・状態遷移](03-status-transition.md)、[07. テーブル定義](07-table-definition.md)、[08. コード定義](08-code-definition.md)、[09. 機能一覧](09-function-list.md)、[10. 機能詳細](10-function-detail.md)、[13. バッチ・通知設計](13-batch-notification.md)、[14. 共通仕様](14-common-spec.md)、[99. 未決事項](99-open-issues.md) |
 
 審査担当部門システム（外部システム）との API 連携（IF01〜IF04）と、担当者がアップロードする申込一括取込ファイル（IF05）を定義する。
@@ -111,7 +111,7 @@ IF ID・IF 名は [09. 機能一覧](09-function-list.md#外部インターフ�
 
 1. T_EXTERNAL_LINK から SEND_STATUS = 0 の行を EXTERNAL_LINK_ID の昇順に取得する。
 2. 行ごとに、対象の版（VERSION_NO）が申込の現行版（T_APPLICATION.CURRENT_VERSION_NO）であることを確認する。違えば送信せず SEND_STATUS = 2、ERROR_MESSAGE「版が更新されたため送信中止」とする（後続に新しい外部連携があるため通知 07 は登録しない）。
-3. 申込・現行版・申込者（M_APPLICANT）と、比較元の版（IF01 は基準版、IF03 の契約変更審査依頼は審査完了版）から電文を組み立て、LINK_TYPE に応じたエンドポイントへ POST する。
+3. 申込・現行版（申込者情報を含む）・申込者アカウント（M_APPLICANT_ACCOUNT。申込者番号）と、比較元の版（IF01 は基準版、IF03 の契約変更審査依頼は審査完了版）から電文を組み立て、LINK_TYPE に応じたエンドポイントへ POST する。
 4. 応答を 3.5 節に従って処理し、1 行ごとにコミットする。
 
 ### 3.2 リクエスト項目
@@ -126,13 +126,13 @@ IF01 と IF03 で共通。「必須」の △ は条件付きで設定する項�
 | 4 | versionNo | number | ○ | T_EXTERNAL_LINK.VERSION_NO | 依頼対象の版。送信時点の現行版と一致する |
 | 5 | versionType | string(1) | ○ | T_APPLICATION_VERSION.VERSION_TYPE | 1：新規申込、2：新規申込の修正、3：契約変更、4：契約変更の修正 |
 | 6 | companyDiv | string(1) | ○ | T_APPLICATION.COMPANY_DIV | 1：事前確認なし、2：事前確認あり |
-| 7 | applicant | object | ○ | | 申込者情報（No.8〜13） |
-| 8 | applicant.applicantNo | string(12) | ○ | M_APPLICANT.APPLICANT_NO | |
-| 9 | applicant.applicantName | string(100) | ○ | M_APPLICANT.APPLICANT_NAME | |
-| 10 | applicant.applicantKana | string(100) | | M_APPLICANT.APPLICANT_KANA | |
-| 11 | applicant.mailAddress | string(254) | ○ | M_APPLICANT.MAIL_ADDRESS | |
-| 12 | applicant.telNo | string(15) | | M_APPLICANT.TEL_NO | |
-| 13 | applicant.address | string(200) | | M_APPLICANT.ADDRESS | |
+| 7 | applicant | object | ○ | | 申込者情報（No.8〜13）。申込者番号以外は現行版の申込データ |
+| 8 | applicant.applicantNo | string(12) | ○ | M_APPLICANT_ACCOUNT.APPLICANT_NO | 一次承認でアカウントを発行済みのため通常は設定される（未紐づけは null） |
+| 9 | applicant.applicantName | string(100) | ○ | T_APPLICATION_VERSION.APPLICANT_NAME（現行版） | |
+| 10 | applicant.applicantKana | string(100) | | T_APPLICATION_VERSION.APPLICANT_KANA（現行版） | |
+| 11 | applicant.mailAddress | string(254) | ○ | T_APPLICATION_VERSION.MAIL_ADDRESS（現行版） | |
+| 12 | applicant.telNo | string(15) | | T_APPLICATION_VERSION.TEL_NO（現行版） | |
+| 13 | applicant.address | string(200) | | T_APPLICATION_VERSION.ADDRESS（現行版） | |
 | 14 | product | object | ○ | | 商品情報（No.15） |
 | 15 | product.productCd | string(10) | ○ | T_APPLICATION_VERSION.PRODUCT_CD | 現行版 |
 | 16 | amounts | object | ○ | | 金額項目（No.16-1〜16-4）。項目の名称・個数は仮 |
@@ -327,12 +327,12 @@ IF02 事前確認結果も同じ構造で、result を `OK` または `NG`（rea
 
 | 列 | 項目名（ヘッダ） | 型 | 桁 | 必須 | チェック | 格納先テーブル.項目 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 申込者番号 | 文字列 | 12 | | 空なら新規の申込者（2〜6 列を登録し採番）。指定した場合は M_APPLICANT.APPLICANT_NO に存在すること（2〜6 列は空） | T_APPLICATION.APPLICANT_ID（申込者番号から申込者 ID に変換） |
-| 2 | 申込者名 | 文字列 | 100 | 新規の申込者○ | 必須、桁 | M_APPLICANT.APPLICANT_NAME |
-| 3 | 申込者名カナ | 文字列 | 100 | | 全角カタカナ・スペース、桁 | M_APPLICANT.APPLICANT_KANA |
-| 4 | メールアドレス | 文字列 | 254 | 新規の申込者○ | 必須、形式、登録済みの申込者と重複しないこと（同じファイル内で先に登録した同じ申込者名の行はその申込者に紐づける） | M_APPLICANT.MAIL_ADDRESS |
-| 5 | 電話番号 | 文字列 | 15 | | 数字とハイフン、桁 | M_APPLICANT.TEL_NO |
-| 6 | 住所 | 文字列 | 200 | | 桁 | M_APPLICANT.ADDRESS |
+| 1 | 申込者番号 | 文字列 | 12 | | 通常は空（申込者アカウントは一次承認が通ったときに発行する）。同じ申込者の 2 件目以降で発行済みのアカウントを使う場合だけ指定し、M_APPLICANT_ACCOUNT.APPLICANT_NO に存在すること。空の場合は、同じメールアドレス（4 列）を現行版に持つ申込がアカウントに紐づいていないこと | T_APPLICATION.APPLICANT_ID（申込者番号から申込者 ID に変換。空は未発行） |
+| 2 | 申込者名 | 文字列 | 100 | ○ | 必須、桁 | T_APPLICATION_VERSION.APPLICANT_NAME |
+| 3 | 申込者名カナ | 文字列 | 100 | | 全角カタカナ・スペース、桁 | T_APPLICATION_VERSION.APPLICANT_KANA |
+| 4 | メールアドレス | 文字列 | 254 | ○ | 必須、形式、桁 | T_APPLICATION_VERSION.MAIL_ADDRESS |
+| 5 | 電話番号 | 文字列 | 15 | | 数字とハイフン、桁 | T_APPLICATION_VERSION.TEL_NO |
+| 6 | 住所 | 文字列 | 200 | | 桁 | T_APPLICATION_VERSION.ADDRESS |
 | 7 | 商品コード | 文字列 | 10 | ○ | 必須、桁、半角英数字（仮） | T_APPLICATION_VERSION.PRODUCT_CD |
 | 8 | 基本料金 | 数値 | 13 | ○ | 必須、カンマなしの整数、0 以上、桁 | T_APPLICATION_VERSION.BASIC_FEE |
 | 9 | オプション料金 | 数値 | 13 | | カンマなしの整数、0 以上、桁。空は 0 | T_APPLICATION_VERSION.OPTION_FEE |
@@ -356,27 +356,27 @@ IF02 事前確認結果も同じ構造で、result を `OK` または `NG`（rea
 | ファイル | ヘッダ行の不一致 | 「ヘッダ行が正しくありません。1 列目は「申込者番号」である必要があります。」 |
 | ファイル | 行数超過、データ行なし | 「取込できる行数は 1,000 行までです。」「取込対象の行がありません。」 |
 | 行 | 列数 | 「列数が正しくありません（13 列必要）。」 |
-| 行 | 必須（新規の申込者の申込者名・メールアドレス、商品コード、基本料金） | E001「申込者名を入力してください。」 |
+| 行 | 必須（申込者名、メールアドレス、商品コード、基本料金） | E001「申込者名を入力してください。」 |
 | 行 | 桁（各列） | E002「備考は1000桁以内で入力してください。」 |
 | 行 | 型・書式（基本料金・オプション料金・事務手数料、契約開始日、契約終了日） | E003「基本料金の形式が正しくありません。」 |
 | 行 | 相関（申込金額合計 > 0） | E005「申込金額合計は1以上の値を入力してください。」 |
 | 行 | 相関（契約開始日 ≦ 契約終了日） | E004「契約終了日は契約開始日以降の日付を入力してください。」 |
-| 行 | 業務（申込者番号の存在） | 「申込者番号 A00000000999 は申込者マスタに存在しません。」 |
-| 行 | 業務（申込者番号を指定した行の申込者情報） | 「申込者番号を指定した行は申込者情報の列を空にしてください（登録済みの申込者の情報は取込で変更しません）。」 |
-| 行 | 業務（メールアドレスの重複） | 「メールアドレス x は登録済みの申込者（C0000000001 山田 太郎）と同じです。同じ申込者なら申込者番号を指定してください。」「同じファイルの 3 行目と同じメールアドレスで申込者名が異なります。」 |
+| 行 | 業務（申込者番号の存在） | 「申込者番号 C0000009999 の申込者アカウントは存在しません。」 |
+| 行 | 業務（アカウントの重複） | 「メールアドレス x の申込者アカウント（C0000000001 山田 太郎）が発行済みです。同じ申込者なら申込者番号を指定してください。」 |
 
-- 同一ファイル内で同じ申込者番号が複数行にあってもエラーにしない（申込者は複数の申込を持てる。仮）。新規の申込者も、同じメールアドレス・申込者名の行は 1 人として登録する。
+- 同一ファイル内で同じ申込者番号が複数行にあってもエラーにしない（1 つのアカウントに複数の申込を紐づけられる。仮）。申込者番号が空で同じメールアドレスの行もエラーにしない（どの行もアカウント未発行の申込として登録する。一次承認が通るとそれぞれに発行されるため、同じ申込者なら後の申込を SC04 で開き、案内された申込者番号を入力して紐づける）。
+- 申込者情報は申込データのため、申込者番号を指定した行でも 2〜6 列を取り込む（アカウントには申込者情報を持たない）。
 - 一括取込（T_IMPORT_BATCH）の総件数はヘッダ行と空行を除いた行数、成功件数は 10100 で登録した件数、エラー件数はスキップした件数とする。
 
 ### 5.4 サンプル
 
-2 行目は新規の申込者の正常行、3 行目は登録済みの申込者を指定した正常行（備考にカンマを含む）、4 行目はエラー行（基本料金の形式、契約終了日が契約開始日より前）の例。
+2 行目はアカウント未発行の申込として取り込む正常行、3 行目は発行済みの申込者アカウントに紐づける正常行（備考にカンマを含む）、4 行目はエラー行（基本料金の形式、契約終了日が契約開始日より前）の例。
 
 ```csv
 申込者番号,申込者名,申込者名カナ,メールアドレス,電話番号,住所,商品コード,基本料金,オプション料金,事務手数料,契約開始日,契約終了日,備考
 ,山田 一郎,ヤマダ イチロウ,ichiro@example.com,03-0000-0001,東京都千代田区1-1-1,PRD001,1000000,0,0,2026-10-01,2027-09-30,
-C0000000001,,,,,,PRD002,2000000,500000,,2026-10-15,,"備考に、カンマを含む例"
-,鈴木 花子,スズキ ハナコ,hanako@example.com,,,PRD001,abc,0,0,2026-10-01,2026-09-01,エラー行の例
+C0000000001,佐藤 花子,サトウ ハナコ,hanako@example.com,,,PRD002,2000000,500000,,2026-10-15,,"備考に、カンマを含む例"
+,鈴木 次郎,スズキ ジロウ,jiro.suzuki@example.com,,,PRD001,abc,0,0,2026-10-01,2026-09-01,エラー行の例
 ```
 
 ## 6. シーケンス図

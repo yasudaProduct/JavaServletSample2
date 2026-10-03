@@ -2,7 +2,7 @@ package com.example.appmgmt.service;
 
 import com.example.appmgmt.common.AppConfig;
 import com.example.appmgmt.dao.ApplicantConsentDao;
-import com.example.appmgmt.dao.ApplicantDao;
+import com.example.appmgmt.dao.ApplicantAccountDao;
 import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.ApprovalRequestDao;
@@ -40,7 +40,7 @@ public final class Services {
 
     private final CompanyDivDao companyDivDao = new CompanyDivDao();
     private final EmployeeDao employeeDao = new EmployeeDao();
-    private final ApplicantDao applicantDao = new ApplicantDao();
+    private final ApplicantAccountDao applicantAccountDao = new ApplicantAccountDao();
     private final StatusDao statusDao = new StatusDao();
     private final StatusTransitionDao statusTransitionDao = new StatusTransitionDao();
     private final ApprovalRouteDao approvalRouteDao = new ApprovalRouteDao();
@@ -59,7 +59,6 @@ public final class Services {
     private final StatusTransitionService statusTransitionService;
     private final ApplicationQueryService applicationQueryService;
     private final ApplicationService applicationService;
-    private final com.example.appmgmt.service.application.ApplicantService applicantService;
     private final ImportService importService;
     private final ApprovalService approvalService;
     private final ConsentService consentService;
@@ -73,19 +72,18 @@ public final class Services {
     private final ExternalLinkSendJob externalLinkSendJob;
 
     private Services(AppConfig config) {
-        notificationService = new NotificationService(notificationDao, employeeDao, applicantDao, statusDao);
+        notificationService = new NotificationService(notificationDao, employeeDao, applicationVersionDao, statusDao);
         consentIssuer = new ConsentIssuer(applicantConsentDao, notificationService);
-        applicantAuthService = new ApplicantAuthService(applicantDao, notificationService);
+        applicantAuthService = new ApplicantAuthService(applicantAccountDao, applicationDao, notificationService);
         statusTransitionService = new StatusTransitionService(applicationDao, applicationVersionDao, companyDivDao, statusTransitionDao, statusHistoryDao,
                 approvalRequestDao, applicantConsentDao, externalLinkDao, notificationService, consentIssuer, applicantAuthService);
-        applicationQueryService = new ApplicationQueryService(applicationDao, applicationVersionDao, applicantDao, employeeDao, statusDao, companyDivDao,
+        applicationQueryService = new ApplicationQueryService(applicationDao, applicationVersionDao, applicantAccountDao, employeeDao, statusDao, companyDivDao,
                 approvalRequestDao, applicantConsentDao, externalLinkDao, statusHistoryDao, statusTransitionDao);
-        applicantService = new com.example.appmgmt.service.application.ApplicantService(applicantDao, applicationDao);
-        applicationService = new ApplicationService(applicationDao, applicationVersionDao, applicantDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer);
-        importService = new ImportService(applicationDao, applicationVersionDao, applicantDao, importBatchDao, statusHistoryDao);
+        applicationService = new ApplicationService(applicationDao, applicationVersionDao, applicantAccountDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer);
+        importService = new ImportService(applicationDao, applicationVersionDao, applicantAccountDao, importBatchDao, statusHistoryDao);
         approvalService = new ApprovalService(applicationDao, approvalRequestDao, approvalRouteDao, employeeDao, applicationQueryService, statusTransitionService, notificationService);
-        consentService = new ConsentService(applicantConsentDao, applicationDao, applicationVersionDao, applicantDao, statusDao, statusTransitionService);
-        externalRequestBuilder = new ExternalRequestBuilder(applicationDao, applicationVersionDao, applicantDao);
+        consentService = new ConsentService(applicantConsentDao, applicationDao, applicationVersionDao, applicantAccountDao, statusDao, statusTransitionService);
+        externalRequestBuilder = new ExternalRequestBuilder(applicationDao, applicationVersionDao, applicantAccountDao);
         externalResultService = new ExternalResultService(externalLinkDao, applicationDao, statusTransitionService);
         authService = new AuthService(employeeDao, companyDivDao);
         masterService = new MasterService(employeeDao, companyDivDao, approvalRouteDao);
@@ -109,7 +107,7 @@ public final class Services {
 
     public CompanyDivDao getCompanyDivDao() { return companyDivDao; }
     public EmployeeDao getEmployeeDao() { return employeeDao; }
-    public ApplicantDao getApplicantDao() { return applicantDao; }
+    public ApplicantAccountDao getApplicantAccountDao() { return applicantAccountDao; }
     public StatusDao getStatusDao() { return statusDao; }
     public StatusTransitionDao getStatusTransitionDao() { return statusTransitionDao; }
     public ApprovalRouteDao getApprovalRouteDao() { return approvalRouteDao; }
@@ -127,7 +125,6 @@ public final class Services {
     public StatusTransitionService getStatusTransitionService() { return statusTransitionService; }
     public ApplicationQueryService getApplicationQueryService() { return applicationQueryService; }
     public ApplicationService getApplicationService() { return applicationService; }
-    public com.example.appmgmt.service.application.ApplicantService getApplicantService() { return applicantService; }
     public ImportService getImportService() { return importService; }
     public ApprovalService getApprovalService() { return approvalService; }
     public ConsentService getConsentService() { return consentService; }

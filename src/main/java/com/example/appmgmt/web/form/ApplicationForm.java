@@ -7,9 +7,18 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import javax.servlet.http.HttpServletRequest;
 
-/** 申込内容の入力フォーム（SC04／SC07／SC08／AP02 共通）。入力値は文字列で保持し、チェック後に版へ変換する。 */
+/**
+ * 申込内容の入力フォーム（SC04／SC07／SC08／AP02 共通）。入力値は文字列で保持し、チェック後に版へ変換する。
+ * 申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）も申込データとしてここで扱う。
+ * applicantNo は申込者アカウントのユーザー ID で、同じ申込者の 2 件目以降に既存のアカウントへ紐づけるときだけ入力する（任意）。
+ */
 public class ApplicationForm {
     private String applicantNo = "";
+    private String applicantName = "";
+    private String applicantKana = "";
+    private String telNo = "";
+    private String mailAddress = "";
+    private String address = "";
     private String productCd = "";
     private String basicFee = "";
     private String optionFee = "";
@@ -21,6 +30,11 @@ public class ApplicationForm {
     public static ApplicationForm bind(HttpServletRequest req) {
         ApplicationForm f = new ApplicationForm();
         f.applicantNo = p(req, "applicantNo");
+        f.applicantName = p(req, "applicantName");
+        f.applicantKana = p(req, "applicantKana");
+        f.telNo = p(req, "telNo");
+        f.mailAddress = p(req, "mailAddress");
+        f.address = p(req, "address");
         f.productCd = p(req, "productCd");
         f.basicFee = p(req, "basicFee");
         f.optionFee = p(req, "optionFee");
@@ -36,39 +50,47 @@ public class ApplicationForm {
         return v == null ? "" : v.trim();
     }
 
+    private static String n(String s) {
+        return s == null ? "" : s;
+    }
+
     public static ApplicationForm from(ApplicationVersion v) {
         ApplicationForm f = new ApplicationForm();
         if (v == null) {
             return f;
         }
-        f.productCd = v.getProductCd() == null ? "" : v.getProductCd();
+        f.applicantName = n(v.getApplicantName());
+        f.applicantKana = n(v.getApplicantKana());
+        f.telNo = n(v.getTelNo());
+        f.mailAddress = n(v.getMailAddress());
+        f.address = n(v.getAddress());
+        f.productCd = n(v.getProductCd());
         f.basicFee = v.getBasicFee() == null ? "" : v.getBasicFee().toPlainString();
         f.optionFee = v.getOptionFee() == null ? "" : v.getOptionFee().toPlainString();
         f.handlingFee = v.getHandlingFee() == null ? "" : v.getHandlingFee().toPlainString();
         f.contractStartDate = Formats.date(v.getContractStartDate());
         f.contractEndDate = Formats.date(v.getContractEndDate());
-        f.remarks = v.getRemarks() == null ? "" : v.getRemarks();
+        f.remarks = n(v.getRemarks());
         return f;
     }
 
     /**
      * 入力チェック（14. 共通仕様 6 章の順序）。
      * @param full true = 必須・相関を含む（確認へ・確定）、false = 桁・書式のみ（一時保存）
-     * @param requireApplicant 申込者番号を必須にする（新規申込）
+     * @param checkApplicantNo 申込者番号（既存アカウントへの紐づけ。任意）の書式を検証する
      * @param amountsOnly 金額項目だけを検証する（SC07 の一部修正）
      */
-    public Validation validate(boolean full, boolean requireApplicant, boolean amountsOnly) {
+    public Validation validate(boolean full, boolean checkApplicantNo, boolean amountsOnly) {
         Validation v = new Validation();
-        if (requireApplicant && !amountsOnly) {
-            if (applicantNo.isEmpty()) {
-                v.reject("applicantNo", "E001", "申込者番号");
-            } else if (applicantNo.length() > 12) {
+        if (checkApplicantNo && !amountsOnly && !applicantNo.isEmpty()) {
+            if (applicantNo.length() > 12) {
                 v.reject("applicantNo", "E002", "申込者番号", 12);
             } else if (!Validation.isAlnum(applicantNo)) {
                 v.reject("applicantNo", "E003", "申込者番号");
             }
         }
         if (!amountsOnly) {
+            validateApplicant(v, full);
             if (full && productCd.isEmpty()) {
                 v.reject("productCd", "E001", "商品コード");
             } else if (productCd.length() > 10) {
@@ -99,6 +121,43 @@ public class ApplicationForm {
             }
         }
         return v;
+    }
+
+    /** 申込者情報のチェック。申込者名・メールアドレスは確認へ・確定で必須（一時保存は桁・書式のみ）。 */
+    private void validateApplicant(Validation v, boolean full) {
+        if (applicantName.isEmpty()) {
+            if (full) {
+                v.reject("applicantName", "E001", "申込者名");
+            }
+        } else if (applicantName.length() > 100) {
+            v.reject("applicantName", "E002", "申込者名", 100);
+        } else if (Validation.hasControlChars(applicantName)) {
+            v.reject("applicantName", "E003", "申込者名");
+        }
+        if (applicantKana.length() > 100) {
+            v.reject("applicantKana", "E002", "申込者名カナ", 100);
+        } else if (!applicantKana.matches("[\\u30A0-\\u30FF\\u3000 ]*")) {
+            v.reject("applicantKana", "E003", "申込者名カナ");
+        }
+        if (telNo.length() > 15) {
+            v.reject("telNo", "E002", "電話番号", 15);
+        } else if (!Validation.isTel(telNo)) {
+            v.reject("telNo", "E003", "電話番号");
+        }
+        if (mailAddress.isEmpty()) {
+            if (full) {
+                v.reject("mailAddress", "E001", "メールアドレス");
+            }
+        } else if (mailAddress.length() > 254) {
+            v.reject("mailAddress", "E002", "メールアドレス", 254);
+        } else if (!Validation.isMail(mailAddress)) {
+            v.reject("mailAddress", "E003", "メールアドレス");
+        }
+        if (address.length() > 200) {
+            v.reject("address", "E002", "住所", 200);
+        } else if (Validation.hasControlChars(address)) {
+            v.reject("address", "E003", "住所");
+        }
     }
 
     private static void checkAmount(Validation v, String field, String value, String name, boolean required) {
@@ -139,21 +198,35 @@ public class ApplicationForm {
         return b.add(o).add(h);
     }
 
-    /** チェック済みの入力を版の内容に変換する。未入力の金額は 0、未入力の日付・備考は null。 */
+    private static String nullIfEmpty(String s) {
+        return s.isEmpty() ? null : s;
+    }
+
+    /** チェック済みの入力を版の内容（申込者情報を含む）に変換する。未入力の金額は 0、未入力の任意項目は null。 */
     public ApplicationVersion toVersion() {
         ApplicationVersion v = new ApplicationVersion();
+        v.setApplicantName(nullIfEmpty(applicantName));
+        v.setApplicantKana(nullIfEmpty(applicantKana));
+        v.setTelNo(nullIfEmpty(telNo));
+        v.setMailAddress(nullIfEmpty(mailAddress));
+        v.setAddress(nullIfEmpty(address));
         v.setProductCd(productCd);
         v.setBasicFee(basicFee.isEmpty() ? BigDecimal.ZERO : Formats.parseAmount(basicFee));
         v.setOptionFee(optionFee.isEmpty() ? BigDecimal.ZERO : Formats.parseAmount(optionFee));
         v.setHandlingFee(handlingFee.isEmpty() ? BigDecimal.ZERO : Formats.parseAmount(handlingFee));
         v.setContractStartDate(Formats.parseDate(contractStartDate));
         v.setContractEndDate(Formats.parseDate(contractEndDate));
-        v.setRemarks(remarks.isEmpty() ? null : remarks);
+        v.setRemarks(nullIfEmpty(remarks));
         v.recalcTotal();
         return v;
     }
 
     public String getApplicantNo() { return applicantNo; }
+    public String getApplicantName() { return applicantName; }
+    public String getApplicantKana() { return applicantKana; }
+    public String getTelNo() { return telNo; }
+    public String getMailAddress() { return mailAddress; }
+    public String getAddress() { return address; }
     public String getProductCd() { return productCd; }
     public String getBasicFee() { return basicFee; }
     public String getOptionFee() { return optionFee; }

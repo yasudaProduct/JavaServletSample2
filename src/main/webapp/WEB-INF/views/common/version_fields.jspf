@@ -1,5 +1,42 @@
-<%-- 申込内容の入力欄。form：ApplicationForm、errors：項目名→メッセージ、amountsOnly：金額項目だけ編集可、base：比較元の版（任意） --%>
+<%-- 申込内容（申込者情報を含む）の入力欄。form：ApplicationForm、errors：項目名→メッセージ、amountsOnly：金額項目だけ編集可、base：比較元の版（任意） --%>
 <c:set var="ro" value="${amountsOnly ? 'readonly' : ''}"/>
+<h3 class="h6 section-title mt-0">申込者情報</h3>
+<div class="form-row">
+  <div class="form-group col-md-4">
+    <label for="applicantName">申込者名 <span class="badge badge-danger">必須</span></label>
+    <input type="text" class="form-control ${not empty errors.applicantName ? 'is-invalid' : ''}" id="applicantName" name="applicantName" maxlength="100" value="<c:out value='${form.applicantName}'/>" ${ro}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：<c:out value="${app:text(base.applicantName)}"/></small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.applicantName}"/></div>
+  </div>
+  <div class="form-group col-md-4">
+    <label for="applicantKana">申込者名カナ</label>
+    <input type="text" class="form-control ${not empty errors.applicantKana ? 'is-invalid' : ''}" id="applicantKana" name="applicantKana" maxlength="100" value="<c:out value='${form.applicantKana}'/>" placeholder="全角カタカナ" ${ro}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：<c:out value="${app:text(base.applicantKana)}"/></small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.applicantKana}"/></div>
+  </div>
+  <div class="form-group col-md-4">
+    <label for="telNo">電話番号</label>
+    <input type="text" class="form-control ${not empty errors.telNo ? 'is-invalid' : ''}" id="telNo" name="telNo" maxlength="15" value="<c:out value='${form.telNo}'/>" placeholder="例：03-0000-0000" ${ro}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：<c:out value="${app:text(base.telNo)}"/></small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.telNo}"/></div>
+  </div>
+</div>
+<div class="form-row">
+  <div class="form-group col-md-5">
+    <label for="mailAddress">メールアドレス <span class="badge badge-danger">必須</span></label>
+    <input type="email" class="form-control ${not empty errors.mailAddress ? 'is-invalid' : ''}" id="mailAddress" name="mailAddress" maxlength="254" value="<c:out value='${form.mailAddress}'/>" ${ro}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：<c:out value="${app:text(base.mailAddress)}"/></small></c:if>
+    <small class="form-text text-muted">確認依頼メールと申込者アカウント通知の宛先です。</small>
+    <div class="invalid-feedback"><c:out value="${errors.mailAddress}"/></div>
+  </div>
+  <div class="form-group col-md-7">
+    <label for="address">住所</label>
+    <input type="text" class="form-control ${not empty errors.address ? 'is-invalid' : ''}" id="address" name="address" maxlength="200" value="<c:out value='${form.address}'/>" ${ro}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：<c:out value="${app:text(base.address)}"/></small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.address}"/></div>
+  </div>
+</div>
+<h3 class="h6 section-title">申込内容</h3>
 <div class="form-row">
   <div class="form-group col-md-4">
     <label for="productCd">商品コード <span class="badge badge-danger">必須</span></label>

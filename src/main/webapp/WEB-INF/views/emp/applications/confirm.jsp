@@ -3,14 +3,12 @@
 <%@ include file="/WEB-INF/views/common/emp_top.jspf" %>
 <div class="card mb-3"><div class="card-body py-2 small">
   <strong>申込番号：</strong><c:out value="${a.applicationNo}"/>　<strong>ステータス：</strong><c:out value="${d.status.displayName}"/>　<strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　<strong>登録区分：</strong>${app:label('REGISTRATION_TYPE', a.registrationType)}<br>
-  <strong>申込者：</strong><c:out value="${d.applicant.applicantNo}"/>／<c:out value="${d.applicant.applicantName}"/>　<strong>確認依頼メールの宛先：</strong><c:out value="${d.applicant.mailAddress}"/>
+  <strong>申込者アカウント：</strong><c:out value="${empty d.applicant.applicantNo ? '未発行（一次承認が通ったときに発行）' : d.applicant.applicantNo}"/>　<strong>確認依頼メール・アカウント通知の宛先：</strong><c:out value="${app:text(viewVersion.mailAddress)}"/>
 </div></div>
 <c:if test="${not empty errors}">
   <div class="alert alert-danger"><strong>入力内容に誤りがあります。「修正」で入力し直してください。</strong><ul class="mb-0"><c:forEach var="e" items="${errors}"><li><c:out value="${e.value}"/></li></c:forEach></ul></div>
 </c:if>
 <c:if test="${not empty diffBase}"><p class="small mb-1"><span class="text-danger font-weight-bold">赤字</span>：全体修正で変更した項目（複写元：第 ${diffBase.versionNo} 版 <c:out value="${diffBase.versionTypeName}"/>）</p></c:if>
-<c:set var="ap" value="${d.applicant}"/><c:set var="apTitle" value="申込者情報（確認依頼メール・申込者ページのアカウント通知の宛先）"/>
-<%@ include file="/WEB-INF/views/common/applicant_view.jspf" %>
 <c:set var="cur" value="${viewVersion}"/><c:set var="base" value="${null}"/><c:set var="curLabel" value="申込内容"/>
 <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
 <div class="d-flex flex-wrap align-items-start">

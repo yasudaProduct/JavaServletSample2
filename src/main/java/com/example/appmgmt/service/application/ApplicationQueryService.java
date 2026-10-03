@@ -3,7 +3,7 @@ package com.example.appmgmt.service.application;
 import com.example.appmgmt.common.ForbiddenException;
 import com.example.appmgmt.common.Tx;
 import com.example.appmgmt.dao.ApplicantConsentDao;
-import com.example.appmgmt.dao.ApplicantDao;
+import com.example.appmgmt.dao.ApplicantAccountDao;
 import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.ApprovalRequestDao;
@@ -36,7 +36,7 @@ public class ApplicationQueryService {
 
     private final ApplicationDao applicationDao;
     private final ApplicationVersionDao versionDao;
-    private final ApplicantDao applicantDao;
+    private final ApplicantAccountDao accountDao;
     private final EmployeeDao employeeDao;
     private final StatusDao statusDao;
     private final CompanyDivDao companyDivDao;
@@ -46,12 +46,12 @@ public class ApplicationQueryService {
     private final StatusHistoryDao historyDao;
     private final StatusTransitionDao transitionDao;
 
-    public ApplicationQueryService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantDao applicantDao, EmployeeDao employeeDao, StatusDao statusDao,
+    public ApplicationQueryService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantAccountDao accountDao, EmployeeDao employeeDao, StatusDao statusDao,
                                    CompanyDivDao companyDivDao, ApprovalRequestDao approvalRequestDao, ApplicantConsentDao consentDao, ExternalLinkDao externalLinkDao, StatusHistoryDao historyDao,
                                    StatusTransitionDao transitionDao) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
-        this.applicantDao = applicantDao;
+        this.accountDao = accountDao;
         this.employeeDao = employeeDao;
         this.statusDao = statusDao;
         this.companyDivDao = companyDivDao;
@@ -140,11 +140,13 @@ public class ApplicationQueryService {
         }
         ApplicationDetail d = new ApplicationDetail();
         d.setApplication(app);
-        d.setApplicant(applicantDao.findById(conn, app.getApplicantId()).orElse(null));
         d.setOwner(employeeDao.findById(conn, app.getOwnerEmployeeId()).orElse(null));
         d.setStatus(statusDao.find(conn, app.getStatusCd()).orElse(null));
         d.setCompanyDiv(companyDivDao.find(conn, app.getCompanyDiv()).orElse(null));
         d.setCurrentVersion(versionDao.get(conn, applicationId, app.getCurrentVersionNo()));
+        // 申込者情報は申込データ（現行版）、ログイン用のデータは申込者アカウント（一次承認で発行するまで null）
+        d.setAccount(app.getApplicantId() == null ? null : accountDao.findById(conn, app.getApplicantId()).orElse(null));
+        d.setApplicant(Applicant.of(d.getCurrentVersion(), d.getAccount()));
         if (app.getBaseVersionNo() != null) {
             d.setBaseVersion(versionDao.find(conn, applicationId, app.getBaseVersionNo()).orElse(null));
         }
@@ -266,11 +268,22 @@ public class ApplicationQueryService {
     public ApplicationDetail detailForApplicant(long applicationId, long applicantId) {
         return Tx.execute(conn -> {
             Application app = applicationDao.findById(conn, applicationId).orElseThrow(ForbiddenException::new);
-            if (app.getApplicantId() != applicantId) {
+            if (app.getApplicantId() == null || app.getApplicantId() != applicantId) {
                 throw new ForbiddenException();
             }
             return detail(conn, applicationId, null, true);
         });
+    }
+
+    /**
+     * 同じメールアドレス（申込データの現行版）で申込者アカウントが発行済みの申込者（重複の確認 W003）。
+     * 同じ申込者の 2 件目以降でアカウントを重複して発行しないよう、申込者番号の指定を促すために使う。
+     */
+    public List<Applicant> duplicateAccounts(String mailAddress, Long excludeApplicationId) {
+        if (mailAddress == null || mailAddress.isBlank()) {
+            return List.of();
+        }
+        return Tx.execute(conn -> applicationDao.findAccountHoldersByMail(conn, mailAddress, excludeApplicationId));
     }
 
     public ApplicationVersion currentVersion(Connection conn, Application app) {

@@ -3,7 +3,7 @@
 <%@ include file="/WEB-INF/views/common/emp_top.jspf" %>
 <div class="card mb-3"><div class="card-body py-2 small">
   <strong>申込番号：</strong><c:out value="${a.applicationNo}"/>　<strong>ステータス：</strong><c:out value="${d.status.displayName}"/>　<strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　
-  <strong>申込者：</strong><c:out value="${d.applicant.applicantNo}"/>／<c:out value="${d.applicant.applicantName}"/>　<strong>会社区分：</strong><c:out value="${d.companyDiv.companyDivName}"/>
+  <strong>申込者：</strong><c:out value="${d.applicant.applicantName}"/>（<c:out value="${empty d.applicant.applicantNo ? 'アカウント未発行' : d.applicant.applicantNo}"/>）　<strong>会社区分：</strong><c:out value="${d.companyDiv.companyDivName}"/>
 </div></div>
 <c:if test="${not empty errors}">
   <div class="alert alert-danger"><strong>入力内容に誤りがあります。「修正」で入力し直してください。</strong><ul class="mb-0"><c:forEach var="e" items="${errors}"><li><c:out value="${e.value}"/></li></c:forEach></ul></div>

@@ -21,7 +21,6 @@ import com.example.appmgmt.service.approval.ApprovalFlowView;
 import com.example.appmgmt.service.approval.ApprovalService;
 import com.example.appmgmt.service.transition.StatusTransitionService;
 import com.example.appmgmt.service.transition.TransitionResult;
-import com.example.appmgmt.web.form.ApplicantForm;
 import com.example.appmgmt.web.form.ApplicationForm;
 import com.example.appmgmt.web.view.MenuSection;
 import com.example.appmgmt.web.view.MenuTile;
@@ -62,7 +61,7 @@ public class ApplicationsServlet extends BaseServlet {
             return;
         }
         if (parts.size() == 1 && "new".equals(parts.get(0))) {
-            showInput(req, res, user, null, "new", ApplicationForm.bind(req), new ApplicantForm(), null, null);
+            showInput(req, res, user, null, "new", ApplicationForm.bind(req), null, null);
             return;
         }
         Long id = parseId(parts.get(0));
@@ -337,27 +336,20 @@ public class ApplicationsServlet extends BaseServlet {
         return user.isAdmin() || (user.isOwner() && d.getApplication().getOwnerEmployeeId() == user.getEmployeeId());
     }
 
-    /** SC15 メンテナンス：申込者情報の変更、申込者への通知の履歴、申込者ページのパスワード初期化。担当者と管理者が使う。 */
+    /**
+     * SC15 メンテナンス：申込者アカウント（ログイン用のデータ）の状態、申込者への通知の履歴、パスワードの初期化。担当者と管理者が使う。
+     * 申込者情報（申込者名・メールアドレスなど）は申込データなので、ここでは変更しない（申込内容の入力・修正で変える）。
+     */
     private void maintenance(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
         ApplicationDetail d = services().getApplicationQueryService().detail(id, user);
         if (!canMaintain(user, d)) {
             throw new ForbiddenException();
         }
-        renderMaintenance(req, res, d, ApplicantForm.from(d.getApplicant()), null, null);
-    }
-
-    private void renderMaintenance(HttpServletRequest req, HttpServletResponse res, ApplicationDetail d, ApplicantForm af, Validation errors, List<Applicant> duplicates)
-            throws ServletException, IOException {
-        long id = d.getApplication().getApplicationId();
         List<com.example.appmgmt.domain.Notification> notices = Tx.execute(conn -> services().getNotificationDao().findApplicantNoticesOfApplication(conn, id));
         req.setAttribute("d", d);
-        req.setAttribute("af", af);
-        req.setAttribute("errors", errors == null ? java.util.Map.of() : errors.getErrors());
-        req.setAttribute("duplicates", duplicates == null ? List.of() : duplicates);
-        req.setAttribute("applicationCount", services().getApplicantService().countApplications(d.getApplicant().getApplicantId()));
-        req.setAttribute("consenting", StatusCd.APPLICANT_CONFIRMING.contains(d.getApplication().getStatusCd()));
+        req.setAttribute("account", d.getAccount());
         req.setAttribute("notices", notices);
-        req.setAttribute("canReset", d.getApplicant() != null && d.getApplicant().isAccountIssued());
+        req.setAttribute("canReset", d.getAccount() != null);
         render(req, res, "emp/applications/maintenance.jsp");
     }
 
@@ -366,38 +358,11 @@ public class ApplicationsServlet extends BaseServlet {
         if (!canMaintain(user, d)) {
             throw new ForbiddenException();
         }
-        if ("updateApplicant".equals(action)) {
-            // 申込者情報の変更（F18）。申込者の行バージョンで楽観ロック。メールアドレスを変えて他の申込者と重なるときは W003 で確認する
-            ApplicantForm af = ApplicantForm.bind(req);
-            Validation v = new Validation();
-            af.validateProfile(v);
-            if (v.hasErrors()) {
-                renderMaintenance(req, res, d, af, v, null);
-                return;
-            }
-            boolean mailChanged = !af.getMailAddress().equalsIgnoreCase(d.getApplicant().getMailAddress());
-            if (mailChanged && !af.isAllowDuplicate()) {
-                List<Applicant> dups = services().getApplicantService().duplicates(af.getMailAddress(), d.getApplicant().getApplicantId());
-                if (!dups.isEmpty()) {
-                    req.setAttribute("duplicateWarning", true);
-                    renderMaintenance(req, res, d, af, null, dups);
-                    return;
-                }
-            }
-            Long applicantRv = longParam(req, "applicantRowVersion");
-            services().getApplicantService().updateProfile(id, af.toApplicant(), applicantRv == null ? -1 : applicantRv.intValue(), user);
-            flashMessage(req, "success", "I019");
-            if (mailChanged && StatusCd.APPLICANT_CONFIRMING.contains(d.getApplication().getStatusCd())) {
-                flashMessage(req, "warning", "W004");
-            }
-            redirect(req, res, "/emp/applications/" + id + "/maintenance");
-            return;
-        }
         if (!"resetPassword".equals(action)) {
             res.sendError(404);
             return;
         }
-        services().getApplicantAuthService().resetPassword(id, services().getApplicationDao());
+        services().getApplicantAuthService().resetPassword(id);
         flashMessage(req, "success", "I018");
         redirect(req, res, "/emp/applications/" + id + "/maintenance");
     }
@@ -446,10 +411,11 @@ public class ApplicationsServlet extends BaseServlet {
     // ------------------------------------------------------------------ SC04 申込入力
 
     /**
-     * SC04 の表示。申込者欄はモードで変わる：新規申込は「新規の申込者を登録する／登録済みの申込者を指定する」、
-     * 追加申込は元の申込の申込者（表示のみ）、入力中は申込者の関与前なら補正可・関与後は表示のみ（F18）。
+     * SC04 の表示。申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）は申込データとして申込内容と同じ欄で入力する。
+     * 申込者アカウントは一次承認で発行する。同じ申込者の 2 件目以降は、アカウント未発行の申込に限り申込者番号（ユーザー ID）を入れて既存のアカウントに紐づけられる。
+     * 追加申込は元の申込のアカウントを引き継ぐ。
      */
-    private void showInput(HttpServletRequest req, HttpServletResponse res, LoginUser user, ApplicationDetail d, String mode, ApplicationForm form, ApplicantForm af,
+    private void showInput(HttpServletRequest req, HttpServletResponse res, LoginUser user, ApplicationDetail d, String mode, ApplicationForm form,
             Validation errors, List<Applicant> duplicates) throws ServletException, IOException {
         if (!user.isOwner()) {
             throw new ForbiddenException();
@@ -457,16 +423,10 @@ public class ApplicationsServlet extends BaseServlet {
         req.setAttribute("d", d);
         req.setAttribute("mode", mode);
         req.setAttribute("form", form);
-        req.setAttribute("af", af);
         req.setAttribute("errors", errors == null ? java.util.Map.of() : errors.getErrors());
         req.setAttribute("duplicates", duplicates == null ? List.of() : duplicates);
-        if (d != null) {
-            req.setAttribute("applicant", d.getApplicant());
-            req.setAttribute("applicantEditable", services().getApplicantService().editableInInput(d.getApplicant()));
-        } else if ("new".equals(mode) && !af.isNewApplicant() && !form.getApplicantNo().isEmpty()) {
-            Applicant a = Tx.execute(conn -> services().getApplicantDao().findByNo(conn, form.getApplicantNo()).orElse(null));
-            req.setAttribute("applicant", a);
-        }
+        // 既存アカウントへの紐づけ欄：新規申込と、アカウント未発行の入力中の申込で表示する
+        req.setAttribute("canLinkAccount", "new".equals(mode) || (d != null && d.getAccount() == null));
         render(req, res, "emp/applications/input.jsp");
     }
 
@@ -475,23 +435,9 @@ public class ApplicationsServlet extends BaseServlet {
         if (src.getApplication().getOwnerEmployeeId() != user.getEmployeeId()) {
             throw new ForbiddenException();
         }
-        ApplicationForm form = ApplicationForm.from(src.getCurrentVersion());
         req.setAttribute("sourceApplication", src.getApplication());
         req.setAttribute("sourceApplicant", src.getApplicant());
-        showInput(req, res, user, null, "additional", withApplicant(form, src.getApplicant().getApplicantNo()), ApplicantForm.from(src.getApplicant()), null, null);
-    }
-
-    private static ApplicationForm withApplicant(ApplicationForm f, String applicantNo) {
-        java.util.Map<String, String[]> m = new java.util.HashMap<>();
-        m.put("applicantNo", new String[] {applicantNo});
-        m.put("productCd", new String[] {f.getProductCd()});
-        m.put("basicFee", new String[] {f.getBasicFee()});
-        m.put("optionFee", new String[] {f.getOptionFee()});
-        m.put("handlingFee", new String[] {f.getHandlingFee()});
-        m.put("contractStartDate", new String[] {f.getContractStartDate()});
-        m.put("contractEndDate", new String[] {f.getContractEndDate()});
-        m.put("remarks", new String[] {f.getRemarks()});
-        return ApplicationForm.bind(new ParamRequest(m));
+        showInput(req, res, user, null, "additional", ApplicationForm.from(src.getCurrentVersion()), null, null);
     }
 
     private void showEdit(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
@@ -499,56 +445,53 @@ public class ApplicationsServlet extends BaseServlet {
         if (!StatusCd.INPUT.equals(d.getApplication().getStatusCd())) {
             throw new TransitionNotAllowedException();
         }
-        showInput(req, res, user, d, "edit", ApplicationForm.from(d.getCurrentVersion()), ApplicantForm.from(d.getApplicant()), null, null);
+        if (d.getAccount() == null) {
+            // 一括取込した申込など、保存前から同じメールアドレスのアカウントが発行済みの場合は紐づけの候補として案内する（警告ではない）
+            req.setAttribute("linkCandidates", services().getApplicationQueryService().duplicateAccounts(d.getCurrentVersion().getMailAddress(), id));
+        }
+        showInput(req, res, user, d, "edit", ApplicationForm.from(d.getCurrentVersion()), null, null);
     }
 
     /**
      * SC04 の一時保存／確認へ。applicationId が null なら新規申込・追加申込（作成）。
-     * 新規の申込者は申込の作成と同じトランザクションで登録・採番する。同じメールアドレスの申込者がいれば W003 を表示し、
-     * 「登録済みの申込者を指定する」に切り替えるか、別の申込者として登録することを確認してから登録する。
+     * 申込者番号を入れずに保存するとき、同じメールアドレスで申込者アカウントが発行済みの申込者がいれば W003 を表示し、
+     * 申込者番号を入れて既存のアカウントに紐づけるか、別の申込者として登録することを確認してから保存する（アカウントの重複を防ぐ）。
      */
     private void postInput(HttpServletRequest req, HttpServletResponse res, LoginUser user, Long applicationId, Long sourceId) throws ServletException, IOException {
         String action = param(req, "action");
         boolean toConfirm = "confirm".equals(action);
         ApplicationForm form = ApplicationForm.bind(req);
-        ApplicantForm af = ApplicantForm.bind(req);
         boolean creating = applicationId == null;
         String mode = creating ? (sourceId == null ? "new" : "additional") : "edit";
         ApplicationDetail d = creating ? null : services().getApplicationQueryService().detail(applicationId, user);
-        boolean newApplicant = "new".equals(mode) && af.isNewApplicant();
-        boolean editApplicant = d != null && services().getApplicantService().editableInInput(d.getApplicant());
-        if ("additional".equals(mode)) {
-            af.setMode(ApplicantForm.MODE_EXISTING);
-        }
-        Validation v = form.validate(toConfirm, creating && !newApplicant, false);
-        if (newApplicant || editApplicant) {
-            af.validateProfile(v);
-        }
+        boolean canLink = "new".equals(mode) || (d != null && d.getAccount() == null);
+        String linkNo = canLink ? form.getApplicantNo() : "";
+        Validation v = form.validate(toConfirm, canLink, false);
         if (sourceId != null) {
             ApplicationDetail src = services().getApplicationQueryService().detail(sourceId, user);
             req.setAttribute("sourceApplication", src.getApplication());
             req.setAttribute("sourceApplicant", src.getApplicant());
         }
         if (v.hasErrors()) {
-            showInput(req, res, user, d, mode, form, af, v, null);
+            showInput(req, res, user, d, mode, form, v, null);
             return;
         }
-        // 重複の確認：新規の申込者、または補正でメールアドレスを変えた申込者
-        boolean mailChanged = editApplicant && !af.getMailAddress().equalsIgnoreCase(d.getApplicant().getMailAddress());
-        if ((newApplicant || mailChanged) && !af.isAllowDuplicate()) {
-            List<Applicant> dups = services().getApplicantService().duplicates(af.getMailAddress(), editApplicant ? d.getApplicant().getApplicantId() : null);
+        // 重複の確認：アカウントに紐づけずに保存するとき、同じメールアドレスの発行済みアカウントがあれば確認する
+        boolean mailChanged = d == null || !form.getMailAddress().equalsIgnoreCase(d.getApplicant().getMailAddress() == null ? "" : d.getApplicant().getMailAddress());
+        if (canLink && linkNo.isEmpty() && mailChanged && !"1".equals(param(req, "allowDuplicate"))) {
+            List<Applicant> dups = services().getApplicationQueryService().duplicateAccounts(form.getMailAddress(), applicationId);
             if (!dups.isEmpty()) {
                 req.setAttribute("duplicateWarning", true);
-                showInput(req, res, user, d, mode, form, af, null, dups);
+                showInput(req, res, user, d, mode, form, null, dups);
                 return;
             }
         }
         try {
             long id;
             if (creating) {
-                id = services().getApplicationService().create(user, form.getApplicantNo(), newApplicant ? af.toApplicant() : null, form.toVersion(), sourceId);
+                id = services().getApplicationService().create(user, linkNo, form.toVersion(), sourceId);
             } else {
-                services().getApplicationService().saveDraft(applicationId, rowVersion(req), form.toVersion(), editApplicant ? af.toApplicant() : null, user);
+                services().getApplicationService().saveDraft(applicationId, rowVersion(req), form.toVersion(), linkNo, user);
                 id = applicationId;
             }
             if (toConfirm) {
@@ -560,7 +503,7 @@ public class ApplicationsServlet extends BaseServlet {
         } catch (BusinessException e) {
             if ("E009".equals(e.getMessageId())) {
                 v.reject("applicantNo", "E009", "申込者番号");
-                showInput(req, res, user, d, mode, form, af, v, null);
+                showInput(req, res, user, d, mode, form, v, null);
                 return;
             }
             throw e;
@@ -753,6 +696,12 @@ public class ApplicationsServlet extends BaseServlet {
         if (amountsOnly) {
             ApplicationForm base = ApplicationForm.from(d.getCurrentVersion());
             java.util.Map<String, String[]> m = new java.util.HashMap<>();
+            // 一部修正は金額だけを反映する。申込者情報を含む他の項目は現行版のまま
+            m.put("applicantName", new String[] {base.getApplicantName()});
+            m.put("applicantKana", new String[] {base.getApplicantKana()});
+            m.put("telNo", new String[] {base.getTelNo()});
+            m.put("mailAddress", new String[] {base.getMailAddress()});
+            m.put("address", new String[] {base.getAddress()});
             m.put("productCd", new String[] {base.getProductCd()});
             m.put("basicFee", new String[] {form.getBasicFee()});
             m.put("optionFee", new String[] {form.getOptionFee()});

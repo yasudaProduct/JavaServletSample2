@@ -28,7 +28,8 @@ public final class AuditContext {
         return String.valueOf(employeeId);
     }
 
-    public static String applicant(long applicantId) {
-        return "AP:" + applicantId;
+    /** 申込者（申込者アカウント ID）。アカウント未発行なら申込者として記録する。 */
+    public static String applicant(Long applicantId) {
+        return applicantId == null ? "AP:-" : "AP:" + applicantId;
     }
 }

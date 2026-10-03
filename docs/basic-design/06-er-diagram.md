@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.2（ステータス体系の改定を反映） |
+| 版 | 0.3（申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウントに変更） |
 | 図の原本 | [er-diagram.drawio](../diagrams/er-diagram.drawio)（draw.io 形式。PNG は [diagrams/png/er-diagram.png](../diagrams/png/er-diagram.png)） |
 | 関連 | [07. テーブル定義](07-table-definition.md)、[08. コード定義](08-code-definition.md) |
 
@@ -22,7 +22,7 @@ erDiagram
     M_COMPANY_DIV ||--o{ M_APPROVAL_ROUTE : "会社区分"
     M_COMPANY_DIV ||--o{ T_APPLICATION : "会社区分"
     M_EMPLOYEE ||--o{ T_APPLICATION : "担当社員"
-    M_APPLICANT ||--o{ T_APPLICATION : "申込者"
+    M_APPLICANT_ACCOUNT |o--o{ T_APPLICATION : "申込者アカウント"
     M_STATUS ||--o{ T_APPLICATION : "現在ステータス"
     M_STATUS ||--o{ M_STATUS_TRANSITION : "遷移元 / 遷移先"
     M_APPROVAL_ROUTE ||--|{ M_APPROVAL_ROUTE_STEP : "承認者"
@@ -48,7 +48,7 @@ erDiagram
 | 2 | M_COMPANY_DIV | M_APPROVAL_ROUTE | COMPANY_DIV | 1 : 0..n | |
 | 3 | M_COMPANY_DIV | T_APPLICATION | COMPANY_DIV | 1 : 0..n | 起票時点の担当社員の会社区分 |
 | 4 | M_EMPLOYEE | T_APPLICATION | OWNER_EMPLOYEE_ID | 1 : 0..n | 担当社員 |
-| 5 | M_APPLICANT | T_APPLICATION | APPLICANT_ID | 1 : 0..n | |
+| 5 | M_APPLICANT_ACCOUNT | T_APPLICATION | APPLICANT_ID | 0..1 : 0..n | 一次承認が通ったときにアカウントを発行して紐づける。同じ申込者の 2 件目以降は申込者番号の指定で既存のアカウントに紐づける。未発行の申込は空 |
 | 6 | M_STATUS | T_APPLICATION | STATUS_CD | 1 : 0..n | 現在ステータス |
 | 7 | M_STATUS | M_STATUS_TRANSITION | FROM_STATUS_CD、TO_STATUS_CD | 1 : 0..n（2 本） | |
 | 8 | M_APPROVAL_ROUTE | M_APPROVAL_ROUTE_STEP | ROUTE_ID | 1 : 1..n | 識別関係（複合主キー） |
@@ -85,12 +85,17 @@ erDiagram
 - 申込者同意（T_APPLICANT_CONSENT）は確認依頼のたびに 1 行作り、確認用トークンのハッシュと同意状態を持つ。再送・引戻し・全体修正で旧行は無効にする。
 - 内容確定日時・同意日時・差戻し日時を分けて持ち、10301→10302、10302→10501／10401、10302→10201 の証跡にする。
 
-### 4.4 外部連携
+### 4.4 申込者
+
+- 申込者名・申込者名カナ・メールアドレス・電話番号・住所は申込データとして申込内容（T_APPLICATION_VERSION）の各版に持つ。全体修正・契約変更・申込者の修正の対象になり、版ごとの差分を表示できる。
+- 申込者アカウント（M_APPLICANT_ACCOUNT）はログインに必要なデータ（申込者番号 = ユーザー ID、パスワードのハッシュ、発行日時、パスワード変更日時）だけを持つ。1 つのアカウントに複数の申込を紐づけられる。
+
+### 4.5 外部連携
 
 - 外部連携（T_EXTERNAL_LINK）は審査担当部門システムへの依頼 1 回につき 1 行。事前確認と審査、新規申込と契約変更を連携種別で区別する。
 - 外部受付番号は結果受信時の照合キーで、一意とする。結果理由に指摘内容・差戻し理由を持つ。
 
-### 4.5 マスタ
+### 4.6 マスタ
 
 - ステータス遷移マスタ（M_STATUS_TRANSITION）が遷移ルールを持ち、会社区分による分岐も事前確認区分で表す。アプリケーションは遷移をハードコードしない。
 - 会社区分マスタ（M_COMPANY_DIV）が外部事前確認の有無と変更基準のしきい値を持つ。
