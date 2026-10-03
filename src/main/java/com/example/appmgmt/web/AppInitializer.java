@@ -24,7 +24,7 @@ public class AppInitializer implements ServletContextListener {
         migrate(config);
         Services.init(config);
         sce.getServletContext().setAttribute("devTools", config.getBoolean("app.dev-tools.enabled", false));
-        sce.getServletContext().setAttribute("appVersion", "0.1.0");
+        sce.getServletContext().setAttribute("appVersion", "0.2.0");
         log.info("初期化が完了しました");
     }
 
