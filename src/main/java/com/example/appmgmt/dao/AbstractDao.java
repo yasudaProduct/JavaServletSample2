@@ -11,7 +11,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -89,7 +88,9 @@ public abstract class AbstractDao {
             Object p = params[i];
             int idx = i + 1;
             if (p == null) {
-                ps.setNull(idx, Types.NULL);
+                // SQL Server は Types.NULL を varbinary として送る。datetime2 へは代入できないため、
+                // ドライバが char の NULL として送る setObject(null) を使う。
+                ps.setObject(idx, null);
             } else if (p instanceof String) {
                 ps.setString(idx, (String) p);
             } else if (p instanceof Integer) {
