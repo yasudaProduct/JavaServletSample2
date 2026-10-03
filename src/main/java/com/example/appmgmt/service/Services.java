@@ -59,6 +59,7 @@ public final class Services {
     private final StatusTransitionService statusTransitionService;
     private final ApplicationQueryService applicationQueryService;
     private final ApplicationService applicationService;
+    private final com.example.appmgmt.service.application.ApplicantService applicantService;
     private final ImportService importService;
     private final ApprovalService approvalService;
     private final ConsentService consentService;
@@ -79,6 +80,7 @@ public final class Services {
                 approvalRequestDao, applicantConsentDao, externalLinkDao, notificationService, consentIssuer, applicantAuthService);
         applicationQueryService = new ApplicationQueryService(applicationDao, applicationVersionDao, applicantDao, employeeDao, statusDao, companyDivDao,
                 approvalRequestDao, applicantConsentDao, externalLinkDao, statusHistoryDao, statusTransitionDao);
+        applicantService = new com.example.appmgmt.service.application.ApplicantService(applicantDao, applicationDao);
         applicationService = new ApplicationService(applicationDao, applicationVersionDao, applicantDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer);
         importService = new ImportService(applicationDao, applicationVersionDao, applicantDao, importBatchDao, statusHistoryDao);
         approvalService = new ApprovalService(applicationDao, approvalRequestDao, approvalRouteDao, employeeDao, applicationQueryService, statusTransitionService, notificationService);
@@ -125,6 +127,7 @@ public final class Services {
     public StatusTransitionService getStatusTransitionService() { return statusTransitionService; }
     public ApplicationQueryService getApplicationQueryService() { return applicationQueryService; }
     public ApplicationService getApplicationService() { return applicationService; }
+    public com.example.appmgmt.service.application.ApplicantService getApplicantService() { return applicantService; }
     public ImportService getImportService() { return importService; }
     public ApprovalService getApprovalService() { return approvalService; }
     public ConsentService getConsentService() { return consentService; }

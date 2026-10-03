@@ -6,6 +6,18 @@
   <strong>申込番号：</strong><c:out value="${a.applicationNo}"/>　<strong>ステータス：</strong><c:out value="${d.status.displayName}"/>　<strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　
   <strong>申込者：</strong><c:out value="${ap.applicantNo}"/>／<c:out value="${ap.applicantName}"/>　<strong>メールアドレス：</strong><c:out value="${ap.mailAddress}"/>
 </div></div>
+<h3 class="h6 section-title">申込者情報の変更</h3>
+<div class="card mb-3" id="applicantProfileCard"><div class="card-body pb-1">
+  <p class="small text-muted mb-2">申込者番号 <strong><c:out value="${ap.applicantNo}"/></strong>（申込者ページのユーザー ID。変更できません）。
+    この申込者は ${applicationCount} 件の申込で使われています${applicationCount > 1 ? '。変更はすべての申込に反映されます' : ''}。
+    <c:if test="${consenting}"><br><span class="text-warning">申込者の確認中です。メールアドレスを変えた場合は「確認依頼メール再送」で新しいアドレスへ送り直してください。</span></c:if></p>
+  <form method="post" action="${ctx}/emp/applications/${a.applicationId}/maintenance/updateApplicant">
+    <input type="hidden" name="_csrf" value="${csrf}">
+    <input type="hidden" name="applicantRowVersion" value="${ap.rowVersion}">
+    <%@ include file="/WEB-INF/views/common/applicant_fields.jspf" %>
+    <button type="submit" class="btn btn-primary mb-3" id="updateApplicantBtn">申込者情報を変更する</button>
+  </form>
+</div></div>
 <div class="row">
   <div class="col-lg-5">
     <h3 class="h6 section-title">申込者アカウント（申込者ページ）</h3>

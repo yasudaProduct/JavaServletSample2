@@ -21,6 +21,7 @@ import com.example.appmgmt.service.approval.ApprovalFlowView;
 import com.example.appmgmt.service.approval.ApprovalService;
 import com.example.appmgmt.service.transition.StatusTransitionService;
 import com.example.appmgmt.service.transition.TransitionResult;
+import com.example.appmgmt.web.form.ApplicantForm;
 import com.example.appmgmt.web.form.ApplicationForm;
 import com.example.appmgmt.web.view.MenuSection;
 import com.example.appmgmt.web.view.MenuTile;
@@ -61,7 +62,7 @@ public class ApplicationsServlet extends BaseServlet {
             return;
         }
         if (parts.size() == 1 && "new".equals(parts.get(0))) {
-            showInput(req, res, user, null, "new", ApplicationForm.bind(req), null);
+            showInput(req, res, user, null, "new", ApplicationForm.bind(req), new ApplicantForm(), null, null);
             return;
         }
         Long id = parseId(parts.get(0));
@@ -336,14 +337,25 @@ public class ApplicationsServlet extends BaseServlet {
         return user.isAdmin() || (user.isOwner() && d.getApplication().getOwnerEmployeeId() == user.getEmployeeId());
     }
 
-    /** SC15 メンテナンス：申込者への通知の履歴と、申込者ページのパスワード初期化。担当者と管理者が使う。 */
+    /** SC15 メンテナンス：申込者情報の変更、申込者への通知の履歴、申込者ページのパスワード初期化。担当者と管理者が使う。 */
     private void maintenance(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
         ApplicationDetail d = services().getApplicationQueryService().detail(id, user);
         if (!canMaintain(user, d)) {
             throw new ForbiddenException();
         }
+        renderMaintenance(req, res, d, ApplicantForm.from(d.getApplicant()), null, null);
+    }
+
+    private void renderMaintenance(HttpServletRequest req, HttpServletResponse res, ApplicationDetail d, ApplicantForm af, Validation errors, List<Applicant> duplicates)
+            throws ServletException, IOException {
+        long id = d.getApplication().getApplicationId();
         List<com.example.appmgmt.domain.Notification> notices = Tx.execute(conn -> services().getNotificationDao().findApplicantNoticesOfApplication(conn, id));
         req.setAttribute("d", d);
+        req.setAttribute("af", af);
+        req.setAttribute("errors", errors == null ? java.util.Map.of() : errors.getErrors());
+        req.setAttribute("duplicates", duplicates == null ? List.of() : duplicates);
+        req.setAttribute("applicationCount", services().getApplicantService().countApplications(d.getApplicant().getApplicantId()));
+        req.setAttribute("consenting", StatusCd.APPLICANT_CONFIRMING.contains(d.getApplication().getStatusCd()));
         req.setAttribute("notices", notices);
         req.setAttribute("canReset", d.getApplicant() != null && d.getApplicant().isAccountIssued());
         render(req, res, "emp/applications/maintenance.jsp");
@@ -353,6 +365,33 @@ public class ApplicationsServlet extends BaseServlet {
         ApplicationDetail d = services().getApplicationQueryService().detail(id, user);
         if (!canMaintain(user, d)) {
             throw new ForbiddenException();
+        }
+        if ("updateApplicant".equals(action)) {
+            // 申込者情報の変更（F18）。申込者の行バージョンで楽観ロック。メールアドレスを変えて他の申込者と重なるときは W003 で確認する
+            ApplicantForm af = ApplicantForm.bind(req);
+            Validation v = new Validation();
+            af.validateProfile(v);
+            if (v.hasErrors()) {
+                renderMaintenance(req, res, d, af, v, null);
+                return;
+            }
+            boolean mailChanged = !af.getMailAddress().equalsIgnoreCase(d.getApplicant().getMailAddress());
+            if (mailChanged && !af.isAllowDuplicate()) {
+                List<Applicant> dups = services().getApplicantService().duplicates(af.getMailAddress(), d.getApplicant().getApplicantId());
+                if (!dups.isEmpty()) {
+                    req.setAttribute("duplicateWarning", true);
+                    renderMaintenance(req, res, d, af, null, dups);
+                    return;
+                }
+            }
+            Long applicantRv = longParam(req, "applicantRowVersion");
+            services().getApplicantService().updateProfile(id, af.toApplicant(), applicantRv == null ? -1 : applicantRv.intValue(), user);
+            flashMessage(req, "success", "I019");
+            if (mailChanged && StatusCd.APPLICANT_CONFIRMING.contains(d.getApplication().getStatusCd())) {
+                flashMessage(req, "warning", "W004");
+            }
+            redirect(req, res, "/emp/applications/" + id + "/maintenance");
+            return;
         }
         if (!"resetPassword".equals(action)) {
             res.sendError(404);
@@ -406,18 +445,25 @@ public class ApplicationsServlet extends BaseServlet {
 
     // ------------------------------------------------------------------ SC04 申込入力
 
-    private void showInput(HttpServletRequest req, HttpServletResponse res, LoginUser user, ApplicationDetail d, String mode, ApplicationForm form, Validation errors)
-            throws ServletException, IOException {
+    /**
+     * SC04 の表示。申込者欄はモードで変わる：新規申込は「新規の申込者を登録する／登録済みの申込者を指定する」、
+     * 追加申込は元の申込の申込者（表示のみ）、入力中は申込者の関与前なら補正可・関与後は表示のみ（F18）。
+     */
+    private void showInput(HttpServletRequest req, HttpServletResponse res, LoginUser user, ApplicationDetail d, String mode, ApplicationForm form, ApplicantForm af,
+            Validation errors, List<Applicant> duplicates) throws ServletException, IOException {
         if (!user.isOwner()) {
             throw new ForbiddenException();
         }
         req.setAttribute("d", d);
         req.setAttribute("mode", mode);
         req.setAttribute("form", form);
+        req.setAttribute("af", af);
         req.setAttribute("errors", errors == null ? java.util.Map.of() : errors.getErrors());
+        req.setAttribute("duplicates", duplicates == null ? List.of() : duplicates);
         if (d != null) {
             req.setAttribute("applicant", d.getApplicant());
-        } else if (!form.getApplicantNo().isEmpty()) {
+            req.setAttribute("applicantEditable", services().getApplicantService().editableInInput(d.getApplicant()));
+        } else if ("new".equals(mode) && !af.isNewApplicant() && !form.getApplicantNo().isEmpty()) {
             Applicant a = Tx.execute(conn -> services().getApplicantDao().findByNo(conn, form.getApplicantNo()).orElse(null));
             req.setAttribute("applicant", a);
         }
@@ -432,7 +478,7 @@ public class ApplicationsServlet extends BaseServlet {
         ApplicationForm form = ApplicationForm.from(src.getCurrentVersion());
         req.setAttribute("sourceApplication", src.getApplication());
         req.setAttribute("sourceApplicant", src.getApplicant());
-        showInput(req, res, user, null, "additional", withApplicant(form, src.getApplicant().getApplicantNo()), null);
+        showInput(req, res, user, null, "additional", withApplicant(form, src.getApplicant().getApplicantNo()), ApplicantForm.from(src.getApplicant()), null, null);
     }
 
     private static ApplicationForm withApplicant(ApplicationForm f, String applicantNo) {
@@ -453,33 +499,56 @@ public class ApplicationsServlet extends BaseServlet {
         if (!StatusCd.INPUT.equals(d.getApplication().getStatusCd())) {
             throw new TransitionNotAllowedException();
         }
-        showInput(req, res, user, d, "edit", ApplicationForm.from(d.getCurrentVersion()), null);
+        showInput(req, res, user, d, "edit", ApplicationForm.from(d.getCurrentVersion()), ApplicantForm.from(d.getApplicant()), null, null);
     }
 
-    /** SC04 の一時保存／確認へ。applicationId が null なら新規申込・追加申込（作成）。 */
+    /**
+     * SC04 の一時保存／確認へ。applicationId が null なら新規申込・追加申込（作成）。
+     * 新規の申込者は申込の作成と同じトランザクションで登録・採番する。同じメールアドレスの申込者がいれば W003 を表示し、
+     * 「登録済みの申込者を指定する」に切り替えるか、別の申込者として登録することを確認してから登録する。
+     */
     private void postInput(HttpServletRequest req, HttpServletResponse res, LoginUser user, Long applicationId, Long sourceId) throws ServletException, IOException {
         String action = param(req, "action");
         boolean toConfirm = "confirm".equals(action);
         ApplicationForm form = ApplicationForm.bind(req);
+        ApplicantForm af = ApplicantForm.bind(req);
         boolean creating = applicationId == null;
         String mode = creating ? (sourceId == null ? "new" : "additional") : "edit";
-        Validation v = form.validate(toConfirm, creating, false);
         ApplicationDetail d = creating ? null : services().getApplicationQueryService().detail(applicationId, user);
+        boolean newApplicant = "new".equals(mode) && af.isNewApplicant();
+        boolean editApplicant = d != null && services().getApplicantService().editableInInput(d.getApplicant());
+        if ("additional".equals(mode)) {
+            af.setMode(ApplicantForm.MODE_EXISTING);
+        }
+        Validation v = form.validate(toConfirm, creating && !newApplicant, false);
+        if (newApplicant || editApplicant) {
+            af.validateProfile(v);
+        }
         if (sourceId != null) {
             ApplicationDetail src = services().getApplicationQueryService().detail(sourceId, user);
             req.setAttribute("sourceApplication", src.getApplication());
             req.setAttribute("sourceApplicant", src.getApplicant());
         }
         if (v.hasErrors()) {
-            showInput(req, res, user, d, mode, form, v);
+            showInput(req, res, user, d, mode, form, af, v, null);
             return;
+        }
+        // 重複の確認：新規の申込者、または補正でメールアドレスを変えた申込者
+        boolean mailChanged = editApplicant && !af.getMailAddress().equalsIgnoreCase(d.getApplicant().getMailAddress());
+        if ((newApplicant || mailChanged) && !af.isAllowDuplicate()) {
+            List<Applicant> dups = services().getApplicantService().duplicates(af.getMailAddress(), editApplicant ? d.getApplicant().getApplicantId() : null);
+            if (!dups.isEmpty()) {
+                req.setAttribute("duplicateWarning", true);
+                showInput(req, res, user, d, mode, form, af, null, dups);
+                return;
+            }
         }
         try {
             long id;
             if (creating) {
-                id = services().getApplicationService().create(user, form.getApplicantNo(), form.toVersion(), sourceId);
+                id = services().getApplicationService().create(user, form.getApplicantNo(), newApplicant ? af.toApplicant() : null, form.toVersion(), sourceId);
             } else {
-                services().getApplicationService().saveDraft(applicationId, rowVersion(req), form.toVersion(), user);
+                services().getApplicationService().saveDraft(applicationId, rowVersion(req), form.toVersion(), editApplicant ? af.toApplicant() : null, user);
                 id = applicationId;
             }
             if (toConfirm) {
@@ -491,7 +560,7 @@ public class ApplicationsServlet extends BaseServlet {
         } catch (BusinessException e) {
             if ("E009".equals(e.getMessageId())) {
                 v.reject("applicantNo", "E009", "申込者番号");
-                showInput(req, res, user, d, mode, form, v);
+                showInput(req, res, user, d, mode, form, af, v, null);
                 return;
             }
             throw e;

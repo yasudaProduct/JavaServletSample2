@@ -9,6 +9,8 @@
   <div class="alert alert-danger"><strong>入力内容に誤りがあります。「修正」で入力し直してください。</strong><ul class="mb-0"><c:forEach var="e" items="${errors}"><li><c:out value="${e.value}"/></li></c:forEach></ul></div>
 </c:if>
 <c:if test="${not empty diffBase}"><p class="small mb-1"><span class="text-danger font-weight-bold">赤字</span>：全体修正で変更した項目（複写元：第 ${diffBase.versionNo} 版 <c:out value="${diffBase.versionTypeName}"/>）</p></c:if>
+<c:set var="ap" value="${d.applicant}"/><c:set var="apTitle" value="申込者情報（確認依頼メール・申込者ページのアカウント通知の宛先）"/>
+<%@ include file="/WEB-INF/views/common/applicant_view.jspf" %>
 <c:set var="cur" value="${viewVersion}"/><c:set var="base" value="${null}"/><c:set var="curLabel" value="申込内容"/>
 <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
 <div class="d-flex flex-wrap align-items-start">

@@ -41,6 +41,16 @@ public class Validation {
         return false;
     }
 
+    /** メールアドレスの簡易チェック（ローカル部@ドメイン、空白なし）。 */
+    public static boolean isMail(String s) {
+        return s != null && s.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+");
+    }
+
+    /** 電話番号（数字とハイフン）。 */
+    public static boolean isTel(String s) {
+        return s != null && s.matches("[0-9-]*");
+    }
+
     public static boolean isAlnum(String s) {
         return s != null && s.matches("[A-Za-z0-9_-]*");
     }

@@ -1,0 +1,43 @@
+<%-- 申込者情報の入力欄（SC04 新規申込・補正、SC15 申込者情報の変更）。af：ApplicantForm、errors：入力エラー --%>
+<div class="form-row">
+  <div class="form-group col-md-4">
+    <label for="applicantName">申込者名 <span class="badge badge-danger">必須</span></label>
+    <input type="text" class="form-control ${not empty errors.applicantName ? 'is-invalid' : ''}" id="applicantName" name="applicantName" maxlength="100" value="<c:out value='${af.applicantName}'/>">
+    <div class="invalid-feedback"><c:out value="${errors.applicantName}"/></div>
+  </div>
+  <div class="form-group col-md-4">
+    <label for="applicantKana">申込者名カナ</label>
+    <input type="text" class="form-control ${not empty errors.applicantKana ? 'is-invalid' : ''}" id="applicantKana" name="applicantKana" maxlength="100" value="<c:out value='${af.applicantKana}'/>" placeholder="全角カタカナ">
+    <div class="invalid-feedback"><c:out value="${errors.applicantKana}"/></div>
+  </div>
+  <div class="form-group col-md-4">
+    <label for="telNo">電話番号</label>
+    <input type="text" class="form-control ${not empty errors.telNo ? 'is-invalid' : ''}" id="telNo" name="telNo" maxlength="15" value="<c:out value='${af.telNo}'/>" placeholder="例：03-0000-0000">
+    <div class="invalid-feedback"><c:out value="${errors.telNo}"/></div>
+  </div>
+</div>
+<div class="form-row">
+  <div class="form-group col-md-5">
+    <label for="mailAddress">メールアドレス <span class="badge badge-danger">必須</span></label>
+    <input type="email" class="form-control ${not empty errors.mailAddress ? 'is-invalid' : ''}" id="mailAddress" name="mailAddress" maxlength="254" value="<c:out value='${af.mailAddress}'/>">
+    <div class="invalid-feedback"><c:out value="${errors.mailAddress}"/></div>
+    <small class="form-text text-muted">確認依頼メールと申込者ページのアカウント通知の宛先です。</small>
+  </div>
+  <div class="form-group col-md-7">
+    <label for="address">住所</label>
+    <input type="text" class="form-control ${not empty errors.address ? 'is-invalid' : ''}" id="address" name="address" maxlength="200" value="<c:out value='${af.address}'/>">
+    <div class="invalid-feedback"><c:out value="${errors.address}"/></div>
+  </div>
+</div>
+<c:if test="${duplicateWarning}">
+  <div class="alert alert-warning" id="duplicateWarning">
+    <strong>W003</strong> <c:out value="${app:message('W003')}"/>
+    <ul class="mb-2">
+      <c:forEach var="x" items="${duplicates}"><li><code><c:out value="${x.applicantNo}"/></code>　<c:out value="${x.applicantName}"/>（<c:out value="${x.mailAddress}"/>）</li></c:forEach>
+    </ul>
+    <div class="custom-control custom-checkbox">
+      <input type="checkbox" class="custom-control-input" id="allowDuplicate" name="allowDuplicate" value="1">
+      <label class="custom-control-label" for="allowDuplicate">同じメールアドレスの別の申込者として登録する</label>
+    </div>
+  </div>
+</c:if>

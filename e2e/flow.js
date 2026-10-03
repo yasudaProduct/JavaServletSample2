@@ -76,9 +76,20 @@ async function mockResult(page, appNo, result, reason = '') {
   await page.waitForLoadState('networkidle');
   console.log('    mock:', (await alerts(page)).slice(0, 100));
 }
-async function createApplication(page, applicantNo, basic, option) {
+// 新規申込。applicant が { no } なら登録済みの申込者、{ name, kana, mail, tel, address } なら新規の申込者として登録する
+async function fillApplicant(page, applicant) {
+  if (applicant.no) {
+    await page.click('label[for=applicantModeExisting]'); await page.fill('#applicantNo', applicant.no);
+  } else {
+    await page.click('label[for=applicantModeNew]');
+    await page.fill('#applicantName', applicant.name); await page.fill('#applicantKana', applicant.kana || '');
+    await page.fill('#mailAddress', applicant.mail); await page.fill('#telNo', applicant.tel || ''); await page.fill('#address', applicant.address || '');
+  }
+}
+async function applicantNoOnMenu(page) { return (await page.locator('.menu-head').textContent()).match(/C\d{10}/)[0]; }
+async function createApplication(page, applicant, basic, option) {
   await page.goto(BASE + '/emp/applications/new');
-  await page.fill('#applicantNo', applicantNo); await page.fill('#productCd', 'PRD001');
+  await fillApplicant(page, applicant); await page.fill('#productCd', 'PRD001');
   await page.fill('#basicFee', basic); await page.fill('#optionFee', option); await page.fill('#handlingFee', '0');
   await page.fill('#contractStartDate', '2026/11/01'); await page.fill('#contractEndDate', '2027/10/31'); await page.fill('#remarks', 'E2E テスト');
   await shot(page, 'SC04');
@@ -159,7 +170,10 @@ async function portalLogin(apPage, id, pw) {
   try {
     // ---------- 会社A（事前確認なし）新規申込 ----------
     await login(page, 'A001'); await shot(page, 'SC02');
-    const a = await createApplication(page, 'C0000000001', '1000000', '200000');
+    const TARO = { name: '山田 太郎', kana: 'ヤマダ タロウ', mail: 'taro.yamada@example.com', tel: '03-0000-0001', address: '東京都千代田区丸の内1-1-1' };
+    const a = await createApplication(page, TARO, '1000000', '200000');
+    a.applicantNo = await applicantNoOnMenu(page);
+    console.log('OK  新規申込で申込者を登録・採番: ' + a.applicantNo);
     await expectStatus(page, '10201', '確定後（メニュー）');
     await shot(page, 'SC14-10201');
     await checkTiles(page, a.appId, '10201');
@@ -168,7 +182,11 @@ async function portalLogin(apPage, id, pw) {
     await page.click('#modifyBtn'); await page.waitForURL('**/edit');
     await page.goto(BASE + '/emp/applications/' + a.appId + '/menu'); await expectStatus(page, '10101', 'SC05 の修正で入力中へ');
     await checkTiles(page, a.appId, '10101');
-    await page.goto(BASE + '/emp/applications/' + a.appId + '/edit'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    // 申込者の関与前（アカウント未発行）は申込入力で申込者情報を補正できる
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/edit'); await shot(page, 'SC04-edit-applicant');
+    await page.fill('#telNo', '03-1111-2222'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    if (!(await page.locator('.applicant-table').textContent()).includes('03-1111-2222')) throw new Error('SC05 should show the corrected applicant tel');
+    console.log('OK  入力中に申込者情報を補正（SC04）→ SC05 に反映');
     await page.click('#confirmBtn'); await page.waitForURL(/\/menu$/); await expectStatus(page, '10201', 'SC05 で再確定');
     await applyApproval(page, a.appId, { expectInitial: ['一郎'], label: '一次承認 初期回付先（テンプレート）' }); await expectStatus(page, '10202', '一次承認申請');
     // 申請した担当者は申請中の承認フローを参照できる（申請ボタンは非活性、引戻しは非活性）
@@ -214,6 +232,10 @@ async function portalLogin(apPage, id, pw) {
     // ---------- SC15 メンテナンス：通知履歴とパスワードの初期化 ----------
     await login(page, 'A001');
     await page.goto(BASE + '/emp/applications/' + a.appId + '/maintenance'); await shot(page, 'SC15');
+    // アカウント発行後の申込者情報の変更は SC15 で行う
+    await page.fill('#address', '東京都千代田区丸の内9-9-9'); await page.click('#updateApplicantBtn'); await page.waitForLoadState('networkidle');
+    if (!(await alerts(page)).includes('申込者情報を変更しました')) throw new Error('SC15 applicant update failed: ' + await alerts(page));
+    console.log('OK  申込者情報の変更（SC15）:', (await page.locator('#address').inputValue()));
     const noticeCards = await page.locator('.notice-card').count();
     if (noticeCards < 2) throw new Error('maintenance: expected applicant notices, got ' + noticeCards);
     page.once('dialog', d => d.accept());
@@ -321,14 +343,29 @@ async function portalLogin(apPage, id, pw) {
 
     // ---------- 申込取消 ----------
     await login(page, 'A001');
-    const c = await createApplication(page, 'C0000000002', '800000', '0');
+    // 同じ申込者の 2 件目：新規の申込者として同じメールアドレスを入力すると W003 → 登録済みの申込者に切り替えて登録する
+    await page.goto(BASE + '/emp/applications/new');
+    await fillApplicant(page, { name: '山田 太郎', mail: 'TARO.YAMADA@example.com' }); await page.fill('#productCd', 'PRD001'); await page.fill('#basicFee', '800000');
+    await page.click('button[value=save]'); await page.waitForLoadState('networkidle');
+    if (await page.locator('#duplicateWarning').count() !== 1) throw new Error('duplicate mail should show W003');
+    const dupNo = (await page.locator('#duplicateWarning code').first().textContent()).trim();
+    if (dupNo !== a.applicantNo) throw new Error('W003 should list ' + a.applicantNo + ' but got ' + dupNo);
+    await shot(page, 'SC04-duplicate');
+    console.log('OK  メールアドレスの重複を警告（W003）: ' + dupNo);
+    await fillApplicant(page, { no: dupNo }); await page.fill('#optionFee', '0'); await page.fill('#handlingFee', '0');
+    await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    await page.click('#confirmBtn'); await page.waitForURL(/\/menu$/);
+    const c = { appId: page.url().split('/').slice(-2)[0] };
+    if (await applicantNoOnMenu(page) !== a.applicantNo) throw new Error('second application should use the registered applicant');
+    console.log('OK  登録済みの申込者で 2 件目の申込を登録: ' + a.applicantNo);
     await menuAction(page, c.appId, 'cancel', '申込者の都合により取消'); await expectStatus(page, '90101', '申込取消');
     await shot(page, 'SC14-90101');
     await logout(page);
 
     // ---------- 会社B（事前確認あり）----------
     await login(page, 'B001');
-    const b = await createApplication(page, 'C0000000003', '3000000', '0');
+    const b = await createApplication(page, { name: '佐藤 次郎', kana: 'サトウ ジロウ', mail: 'jiro.sato@example.com', tel: '06-0000-0003', address: '大阪府大阪市北区梅田3-3-3' }, '3000000', '0');
+    b.applicantNo = await applicantNoOnMenu(page);
     await applyApproval(page, b.appId, { approvers: [] }); await expectStatus(page, '10301', 'B 回付先なし');
     const urlB = await consentUrlFor(page, b.appNo);
     await applicantConsent(ctx, urlB, {});
@@ -345,7 +382,10 @@ async function portalLogin(apPage, id, pw) {
     page.once('dialog', d => d.accept());
     await page.click('#modifyBtn'); await page.waitForURL('**/edit');
     await page.goto(BASE + '/emp/applications/' + b.appId + '/menu'); await expectStatus(page, '10101', 'B 全体修正（SC05 の修正）');
-    await page.goto(BASE + '/emp/applications/' + b.appId + '/edit'); await page.fill('#remarks', '全体修正で備考を変更'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    await page.goto(BASE + '/emp/applications/' + b.appId + '/edit');
+    if (await page.locator('#applicantReadonlyNote').count() !== 1 || await page.locator('#applicantName').count() !== 0) throw new Error('applicant should be read-only after account issuance');
+    console.log('OK  アカウント発行後は申込入力で申込者情報を変更できない');
+    await page.fill('#remarks', '全体修正で備考を変更'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
     const changedCells = await page.locator('td.changed').count();
     if (changedCells < 1) throw new Error('full revise: changed items should be red');
     console.log('OK  全体修正の変更項目を赤字表示: ' + changedCells + ' 項目'); await shot(page, 'SC05-fullrevise-diff');
@@ -356,9 +396,19 @@ async function portalLogin(apPage, id, pw) {
     await shot(page, 'SC14-B-final');
     // 一括取込
     await page.goto(BASE + '/emp/import');
-    await page.setInputFiles('input[name=file]', { name: 'import.csv', mimeType: 'text/csv', buffer: Buffer.from('﻿申込者番号,商品コード,基本料金,オプション料金,事務手数料,契約開始日,契約終了日,備考\nC0000000004,PRD002,500000,0,0,2026-10-01,2027-09-30,\nC0000000005,PRD001,abc,0,0,2026-10-01,2026-09-01,エラー行\nC0000000009,PRD001,1000,0,0,,,存在しない申込者\n', 'utf8') });
+    const csv = '\ufeff申込者番号,申込者名,申込者名カナ,メールアドレス,電話番号,住所,商品コード,基本料金,オプション料金,事務手数料,契約開始日,契約終了日,備考\n'
+      + ',高橋 美咲,タカハシ ミサキ,misaki.takahashi@example.com,052-000-0004,愛知県名古屋市中区栄4-4-4,PRD002,500000,0,0,2026-10-01,2027-09-30,新規の申込者\n'
+      + b.applicantNo + ',,,,,,PRD001,700000,0,0,2026-10-01,2027-09-30,登録済みの申込者\n'
+      + ',高橋 美咲,タカハシ ミサキ,misaki.takahashi@example.com,,,PRD001,300000,0,0,,,同じファイルの同じ申込者\n'
+      + ',田中 健一,タナカ ケンイチ,kenichi.tanaka@example.com,,,PRD001,abc,0,0,2026-10-01,2026-09-01,エラー行\n'
+      + 'C0000009999,,,,,,PRD001,1000,0,0,,,存在しない申込者\n'
+      + ',別人 花子,,jiro.sato@example.com,,,PRD001,1000,0,0,,,登録済みと同じメールアドレス\n';
+    await page.setInputFiles('input[name=file]', { name: 'import.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf8') });
     await page.click('button:has-text("取込実行")'); await page.waitForLoadState('networkidle'); await shot(page, 'SC10');
-    console.log('    import:', (await page.locator('.card-body').nth(1).textContent()).replace(/\s+/g, ' ').slice(0, 120));
+    const importText = (await page.locator('.card-body').nth(1).textContent()).replace(/\s+/g, ' ');
+    console.log('    import:', importText.slice(0, 120));
+    if (!/成功：\s*3/.test(importText) || !/エラー：\s*3/.test(importText)) throw new Error('import should succeed 3 and fail 3: ' + importText.slice(0, 200));
+    console.log('OK  一括取込で申込者を登録（新規 1 名・登録済み 1 名・同じファイル内の同一申込者をまとめる）、エラー 3 行');
     await logout(page);
     // 管理者：マスタ画面
     await login(page, 'A009'); await page.goto(BASE + '/emp/master/employees'); await shot(page, 'SC11');

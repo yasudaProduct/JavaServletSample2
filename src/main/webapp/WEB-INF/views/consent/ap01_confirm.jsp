@@ -3,6 +3,9 @@
 <p class="small text-muted">申込番号 <c:out value="${v.application.applicationNo}"/>　<c:out value="${v.applicant.applicantName}"/> 様　手続きの状況：<strong><c:out value="${v.applicantStatusName}"/></strong><c:if test="${not empty v.consent}">　確認期限：${app:datetime(v.consent.tokenExpiresAt)}</c:if></p>
 <c:set var="cur" value="${v.version}"/><c:set var="base" value="${v.contractChange ? v.beforeVersion : null}"/><c:set var="curLabel" value="${v.contractChange ? '変更後' : 'お申込内容'}"/><c:set var="baseLabel" value="変更前"/>
 <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
+<c:set var="ap" value="${v.applicant}"/><c:set var="apTitle" value="お客様情報"/><c:set var="apNoLabel" value="お客様番号（ユーザー ID）"/>
+<%@ include file="/WEB-INF/views/common/applicant_view.jspf" %>
+<p class="small text-muted">お客様情報は申込受付会社が登録した内容です。誤りがある場合は、次の画面で「差戻し」を選び、理由に正しい内容をご記入ください。</p>
 <form method="post" action="${ctx}${consentBase}/confirm">
   <input type="hidden" name="_csrf" value="${csrf}">
   <div class="custom-control custom-checkbox mb-3">

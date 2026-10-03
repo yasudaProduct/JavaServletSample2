@@ -34,7 +34,13 @@ import java.util.Optional;
 /** F01 申込一括取込（IF05 の CSV）。 */
 public class ImportService {
 
-    public static final String[] HEADER = {"申込者番号", "商品コード", "基本料金", "オプション料金", "事務手数料", "契約開始日", "契約終了日", "備考"};
+    /**
+     * 列：申込者（番号・名・カナ・メールアドレス・電話番号・住所）＋申込内容。
+     * 申込者番号が空の行は新規の申込者として登録・採番する（F18）。指定した行は登録済みの申込者に紐づけ、申込者情報の列は空にする。
+     */
+    public static final String[] HEADER = {"申込者番号", "申込者名", "申込者名カナ", "メールアドレス", "電話番号", "住所",
+            "商品コード", "基本料金", "オプション料金", "事務手数料", "契約開始日", "契約終了日", "備考"};
+    private static final int C_PRODUCT = 6;
     public static final int MAX_ROWS = 1000;
     public static final long MAX_SIZE = 5L * 1024 * 1024;
 
@@ -120,27 +126,60 @@ public class ImportService {
             long batchId = importBatchDao.insert(conn, batch);
             int success = 0;
             int error = 0;
+            // 同じファイル内で新規登録した申込者（メールアドレスの小文字 → 申込者と登録した行番号）
+            java.util.Map<String, Object[]> createdInFile = new java.util.HashMap<>();
             for (int i = 0; i < dataRows.size(); i++) {
                 List<String> row = dataRows.get(i);
                 int lineNo = lineNos.get(i);
                 List<String> errors = new ArrayList<>();
                 ApplicationVersion v = new ApplicationVersion();
                 Applicant applicant = null;
+                Applicant newApplicant = null;
                 if (row.size() != HEADER.length) {
                     errors.add("列数が正しくありません（" + HEADER.length + " 列必要）。");
                 } else {
                     String applicantNo = row.get(0).trim();
-                    String productCd = row.get(1).trim();
-                    if (applicantNo.isEmpty()) {
-                        errors.add(Messages.get("E001", "申込者番号"));
-                    } else if (applicantNo.length() > 12) {
-                        errors.add(Messages.get("E002", "申込者番号", 12));
+                    Applicant profile = profileOf(row);
+                    boolean profileGiven = row.subList(1, C_PRODUCT).stream().anyMatch(c -> !c.isBlank());
+                    if (!applicantNo.isEmpty()) {
+                        // 登録済みの申込者を指定
+                        if (applicantNo.length() > 12) {
+                            errors.add(Messages.get("E002", "申込者番号", 12));
+                        } else {
+                            applicant = applicantDao.findByNo(conn, applicantNo).orElse(null);
+                            if (applicant == null) {
+                                errors.add("申込者番号 " + applicantNo + " は申込者マスタに存在しません。");
+                            }
+                        }
+                        if (profileGiven) {
+                            errors.add("申込者番号を指定した行は申込者情報の列を空にしてください（登録済みの申込者の情報は取込で変更しません）。");
+                        }
                     } else {
-                        applicant = applicantDao.findByNo(conn, applicantNo).orElse(null);
-                        if (applicant == null) {
-                            errors.add("申込者番号 " + applicantNo + " は申込者マスタに存在しません。");
+                        // 新規の申込者：申込者情報を検証し、同じメールアドレスの申込者がいないことを確認する
+                        int before = errors.size();
+                        validateProfile(profile, errors);
+                        if (errors.size() == before) {
+                            String key = profile.getMailAddress().toLowerCase();
+                            Object[] created = createdInFile.get(key);
+                            if (created != null) {
+                                Applicant c = (Applicant) created[0];
+                                if (c.getApplicantName().equals(profile.getApplicantName())) {
+                                    applicant = c;
+                                } else {
+                                    errors.add("同じファイルの " + created[1] + " 行目と同じメールアドレスで申込者名が異なります。");
+                                }
+                            } else {
+                                List<Applicant> dup = applicantDao.findByMail(conn, profile.getMailAddress(), null);
+                                if (!dup.isEmpty()) {
+                                    errors.add("メールアドレス " + profile.getMailAddress() + " は登録済みの申込者（" + dup.get(0).getApplicantNo() + " " + dup.get(0).getApplicantName()
+                                            + "）と同じです。同じ申込者なら申込者番号を指定してください。");
+                                } else {
+                                    newApplicant = profile;
+                                }
+                            }
                         }
                     }
+                    String productCd = row.get(C_PRODUCT).trim();
                     if (productCd.isEmpty()) {
                         errors.add(Messages.get("E001", "商品コード"));
                     } else if (productCd.length() > 10) {
@@ -149,12 +188,12 @@ public class ImportService {
                         errors.add(Messages.get("E003", "商品コード"));
                     }
                     v.setProductCd(productCd);
-                    v.setBasicFee(amount(row.get(2), "基本料金", true, errors));
-                    v.setOptionFee(amount(row.get(3), "オプション料金", false, errors));
-                    v.setHandlingFee(amount(row.get(4), "事務手数料", false, errors));
-                    v.setContractStartDate(date(row.get(5), "契約開始日", errors));
-                    v.setContractEndDate(date(row.get(6), "契約終了日", errors));
-                    String remarks = row.get(7).trim();
+                    v.setBasicFee(amount(row.get(C_PRODUCT + 1), "基本料金", true, errors));
+                    v.setOptionFee(amount(row.get(C_PRODUCT + 2), "オプション料金", false, errors));
+                    v.setHandlingFee(amount(row.get(C_PRODUCT + 3), "事務手数料", false, errors));
+                    v.setContractStartDate(date(row.get(C_PRODUCT + 4), "契約開始日", errors));
+                    v.setContractEndDate(date(row.get(C_PRODUCT + 5), "契約終了日", errors));
+                    String remarks = row.get(C_PRODUCT + 6).trim();
                     if (remarks.length() > 1000) {
                         errors.add(Messages.get("E002", "備考", 1000));
                     } else if (Validation.hasControlChars(remarks)) {
@@ -170,6 +209,10 @@ public class ImportService {
                             errors.add(Messages.get("E005", "申込金額合計", 1));
                         }
                     }
+                }
+                if (errors.isEmpty() && newApplicant != null) {
+                    applicant = ApplicantService.register(conn, applicantDao, newApplicant);
+                    createdInFile.put(newApplicant.getMailAddress().toLowerCase(), new Object[] {applicant, lineNo});
                 }
                 if (!errors.isEmpty()) {
                     ImportError e = new ImportError();
@@ -256,5 +299,45 @@ public class ImportService {
 
     public List<ImportBatch> history(LoginUser user) {
         return Tx.execute(conn -> importBatchDao.findByEmployee(conn, user.getEmployeeId(), 20));
+    }
+
+    private static Applicant profileOf(List<String> row) {
+        Applicant a = new Applicant();
+        a.setApplicantName(row.get(1).trim());
+        a.setApplicantKana(row.get(2).trim().isEmpty() ? null : row.get(2).trim());
+        a.setMailAddress(row.get(3).trim());
+        a.setTelNo(row.get(4).trim().isEmpty() ? null : row.get(4).trim());
+        a.setAddress(row.get(5).trim().isEmpty() ? null : row.get(5).trim());
+        return a;
+    }
+
+    /** 新規の申込者の列チェック（SC04 の申込者情報と同じ）。 */
+    private static void validateProfile(Applicant a, List<String> errors) {
+        String name = a.getApplicantName();
+        if (name.isEmpty()) {
+            errors.add(Messages.get("E001", "申込者名"));
+        } else if (name.length() > 100) {
+            errors.add(Messages.get("E002", "申込者名", 100));
+        }
+        String kana = a.getApplicantKana() == null ? "" : a.getApplicantKana();
+        if (kana.length() > 100) {
+            errors.add(Messages.get("E002", "申込者名カナ", 100));
+        } else if (!kana.matches("[\\u30A0-\\u30FF\\u3000 ]*")) {
+            errors.add(Messages.get("E003", "申込者名カナ"));
+        }
+        String mail = a.getMailAddress();
+        if (mail.isEmpty()) {
+            errors.add(Messages.get("E001", "メールアドレス"));
+        } else if (mail.length() > 254 || !Validation.isMail(mail)) {
+            errors.add(Messages.get("E003", "メールアドレス"));
+        }
+        String tel = a.getTelNo() == null ? "" : a.getTelNo();
+        if (tel.length() > 15 || !Validation.isTel(tel)) {
+            errors.add(Messages.get("E003", "電話番号"));
+        }
+        String addr = a.getAddress() == null ? "" : a.getAddress();
+        if (addr.length() > 200) {
+            errors.add(Messages.get("E002", "住所", 200));
+        }
     }
 }

@@ -71,13 +71,19 @@ public class ApplicationService {
 
     // ---------------------------------------------------------------- F03 新規申込・追加申込・入力
 
-    /** 新規申込（登録区分 2）または追加申込（登録区分 3）を作成する。ステータス 10101、第 1 版、履歴 00。 */
-    public long create(LoginUser user, String applicantNo, ApplicationVersion content, Long sourceApplicationId) {
+    /**
+     * 新規申込（登録区分 2）または追加申込（登録区分 3）を作成する。ステータス 10101、第 1 版、履歴 00。
+     * newApplicant を渡すと、申込者を登録（申込者番号を採番）してから申込を作成する（F18。同一トランザクション）。
+     * newApplicant が null なら applicantNo の登録済み申込者を使う。
+     */
+    public long create(LoginUser user, String applicantNo, Applicant newApplicant, ApplicationVersion content, Long sourceApplicationId) {
         if (!user.isOwner()) {
             throw new ForbiddenException();
         }
         return Tx.execute(conn -> {
-            Applicant applicant = applicantDao.findByNo(conn, applicantNo).orElseThrow(() -> new BusinessException("E009", "申込者番号"));
+            Applicant applicant = newApplicant != null
+                    ? ApplicantService.register(conn, applicantDao, newApplicant)
+                    : applicantDao.findByNo(conn, applicantNo).orElseThrow(() -> new BusinessException("E009", "申込者番号"));
             if (sourceApplicationId != null) {
                 Application src = applicationDao.findById(conn, sourceApplicationId).orElseThrow(ForbiddenException::new);
                 if (src.getOwnerEmployeeId() != user.getEmployeeId()) {
@@ -119,8 +125,25 @@ public class ApplicationService {
 
     /** 一時保存（10101／20101）。現行版をそのまま更新する。遷移・履歴なし。 */
     public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, LoginUser user) {
+        saveDraft(applicationId, rowVersion, content, null, user);
+    }
+
+    /**
+     * 一時保存。applicantProfile を渡すと申込者情報も更新する（申込者の関与前＝アカウント未発行で、この申込だけで使われている申込者に限る。F18）。
+     */
+    public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, Applicant applicantProfile, LoginUser user) {
         Tx.executeVoid(conn -> {
             Application app = load(conn, applicationId, rowVersion, user, Set.of(StatusCd.INPUT, StatusCd.CHG_INPUT));
+            if (applicantProfile != null) {
+                Applicant current = applicantDao.findById(conn, app.getApplicantId()).orElseThrow(ForbiddenException::new);
+                if (current.isAccountIssued() || applicantDao.countApplications(conn, current.getApplicantId()) > 1) {
+                    throw new BusinessException("E118");
+                }
+                applicantProfile.setApplicantId(current.getApplicantId());
+                if (applicantDao.updateProfile(conn, applicantProfile, current.getRowVersion()) != 1) {
+                    throw new OptimisticLockException();
+                }
+            }
             ApplicationVersion v = versionDao.get(conn, applicationId, app.getCurrentVersionNo());
             applyContent(v, content);
             v.setAmountRatio(null);

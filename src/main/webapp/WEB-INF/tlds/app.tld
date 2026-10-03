@@ -9,6 +9,7 @@
   <function><name>amount</name><function-class>com.example.appmgmt.web.view.Fn</function-class><function-signature>java.lang.String amount(java.math.BigDecimal)</function-signature></function>
   <function><name>ratio</name><function-class>com.example.appmgmt.web.view.Fn</function-class><function-signature>java.lang.String ratio(java.math.BigDecimal)</function-signature></function>
   <function><name>label</name><function-class>com.example.appmgmt.web.view.Fn</function-class><function-signature>java.lang.String label(java.lang.String, java.lang.String)</function-signature></function>
+  <function><name>message</name><function-class>com.example.appmgmt.web.view.Fn</function-class><function-signature>java.lang.String message(java.lang.String)</function-signature></function>
   <function><name>text</name><function-class>com.example.appmgmt.web.view.Fn</function-class><function-signature>java.lang.String text(java.lang.Object)</function-signature></function>
   <function><name>differs</name><function-class>com.example.appmgmt.web.view.Fn</function-class><function-signature>boolean differs(java.lang.Object, java.lang.Object)</function-signature></function>
 </taglib>

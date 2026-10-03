@@ -32,6 +32,11 @@ public final class Fn {
         return Codes.label(group, code);
     }
 
+    /** メッセージ定義（messages.properties）の文言。 */
+    public static String message(String id) {
+        return com.example.appmgmt.common.Messages.get(id);
+    }
+
     public static String text(Object v) {
         return v == null || v.toString().isEmpty() ? "－" : v.toString();
     }

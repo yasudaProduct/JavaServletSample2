@@ -1,0 +1,11 @@
+<%-- 申込者情報の参照表。ap：申込者、apTitle：見出し（省略時は「申込者情報」）、apNoLabel：番号の見出し（省略時は「申込者番号」） --%>
+<table class="table table-sm table-bordered applicant-table mb-3">
+  <thead class="thead-light"><tr><th colspan="2">${empty apTitle ? '申込者情報' : apTitle}</th></tr></thead>
+  <tbody>
+    <tr><th style="width: 24%;">${empty apNoLabel ? '申込者番号' : apNoLabel}</th><td><c:out value="${ap.applicantNo}"/></td></tr>
+    <tr><th style="width: 24%;">お名前</th><td><c:out value="${ap.applicantName}"/><c:if test="${not empty ap.applicantKana}">（<c:out value="${ap.applicantKana}"/>）</c:if></td></tr>
+    <tr><th>メールアドレス</th><td><c:out value="${ap.mailAddress}"/></td></tr>
+    <tr><th>電話番号</th><td><c:out value="${app:text(ap.telNo)}"/></td></tr>
+    <tr><th>住所</th><td><c:out value="${app:text(ap.address)}"/></td></tr>
+  </tbody>
+</table>
