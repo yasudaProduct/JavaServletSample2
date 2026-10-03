@@ -1,0 +1,32 @@
+<%-- メニューのタイル。tiles：List<MenuTile>、rowVersion：POST 用の行バージョン（申込受付会社側） --%>
+<div class="row">
+  <c:forEach var="t" items="${tiles}">
+    <div class="col-lg-4 col-md-6 mb-3">
+      <div class="card h-100 tile ${t.enabled ? '' : 'tile-disabled'}" id="tile-${t.key}">
+        <div class="card-body d-flex flex-column">
+          <h3 class="h6 card-title mb-2"><c:out value="${t.title}"/></h3>
+          <p class="card-text small text-muted flex-grow-1"><c:out value="${t.description}"/></p>
+          <c:choose>
+            <c:when test="${not t.enabled}">
+              <p class="small text-muted mb-2"><c:out value="${t.note}"/></p>
+              <button type="button" class="btn btn-secondary btn-sm" disabled><c:out value="${t.title}"/></button>
+            </c:when>
+            <c:when test="${t.post}">
+              <form method="post" action="${ctx}${t.formAction}" ${not empty t.confirm ? 'data-confirm="'.concat(fn:escapeXml(t.confirm)).concat('"') : ''}>
+                <input type="hidden" name="_csrf" value="${csrf}">
+                <input type="hidden" name="rowVersion" value="${rowVersion}">
+                <c:if test="${t.reasonInput}">
+                  <textarea class="form-control form-control-sm mb-2" name="reason" rows="2" maxlength="500" placeholder="取消理由（任意）"></textarea>
+                </c:if>
+                <button type="submit" class="btn btn-${t.style} btn-sm"><c:out value="${t.title}"/></button>
+              </form>
+            </c:when>
+            <c:otherwise>
+              <a class="btn btn-${t.style} btn-sm" href="${ctx}${t.href}"><c:out value="${t.title}"/></a>
+            </c:otherwise>
+          </c:choose>
+        </div>
+      </div>
+    </div>
+  </c:forEach>
+</div>

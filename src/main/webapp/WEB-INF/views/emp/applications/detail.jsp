@@ -1,52 +1,16 @@
-<c:set var="pageTitle" value="SC03 申込詳細"/>
+<c:set var="pageTitle" value="SC03 申込確認"/>
 <c:set var="a" value="${d.application}"/>
 <%@ include file="/WEB-INF/views/common/emp_top.jspf" %>
-<c:set var="base" value="${ctx}/emp/applications/${a.applicationId}"/>
 <div class="d-flex justify-content-between align-items-start mb-2">
   <div>
     <h2 class="h5 mb-1">申込番号 <c:out value="${a.applicationNo}"/>
-      <span class="badge badge-${fn:endsWith(a.statusCd, '701') ? 'success' : 'primary'} status-badge ml-2">${a.statusCd} <c:out value="${d.status.statusName}"/></span></h2>
+      <span class="badge badge-${fn:endsWith(a.statusCd, '701') ? 'success' : a.statusCd == '90101' ? 'dark' : 'primary'} status-badge ml-2">${a.statusCd} <c:out value="${d.status.statusName}"/></span></h2>
     <div class="text-muted small"><c:out value="${d.status.description}"/></div>
   </div>
-  <a class="btn btn-outline-secondary btn-sm" href="${ctx}/emp/applications">一覧へ戻る</a>
-</div>
-
-<%-- 操作ボタン --%>
-<div class="mb-3 d-flex flex-wrap align-items-center">
-  <c:if test="${d.has('confirm')}"><a class="btn btn-primary btn-sm mr-2 mb-1" href="${base}/confirm">内容確認</a></c:if>
-  <c:if test="${d.has('confirmChange')}"><a class="btn btn-primary btn-sm mr-2 mb-1" href="${base}/change/confirm">内容確認</a></c:if>
-  <c:if test="${d.has('input')}"><a class="btn btn-primary btn-sm mr-2 mb-1" href="${base}/edit">入力</a></c:if>
-  <c:if test="${d.has('inputChange')}"><a class="btn btn-primary btn-sm mr-2 mb-1" href="${base}/change">入力</a></c:if>
-  <c:if test="${d.has('modify') or d.has('modifyChange')}">
-    <form method="post" action="${base}/modify" class="d-inline mr-2 mb-1"><input type="hidden" name="_csrf" value="${csrf}"><input type="hidden" name="rowVersion" value="${a.rowVersion}">
-      <button type="submit" class="btn btn-outline-primary btn-sm">修正</button></form>
-  </c:if>
-  <c:if test="${d.has('revise')}"><a class="btn btn-outline-primary btn-sm mr-2 mb-1" href="${base}/revise">修正（金額）</a></c:if>
-  <c:if test="${d.has('fix')}"><a class="btn btn-outline-primary btn-sm mr-2 mb-1" href="${base}/revise">修正対応</a></c:if>
-  <c:if test="${d.has('fullRevise')}">
-    <form method="post" action="${base}/fullRevise" class="d-inline mr-2 mb-1" data-confirm="全体修正を開始します。申込内容全体を修正し直し、申込者の同意を取り直します。よろしいですか？"><input type="hidden" name="_csrf" value="${csrf}"><input type="hidden" name="rowVersion" value="${a.rowVersion}">
-      <button type="submit" class="btn btn-outline-warning btn-sm">全体修正</button></form>
-  </c:if>
-  <c:if test="${d.has('request')}"><a class="btn btn-success btn-sm mr-2 mb-1" href="${base}/approval">申請（承認フロー）</a></c:if>
-  <c:if test="${d.has('approvalFlow')}"><a class="btn btn-success btn-sm mr-2 mb-1" href="${base}/approval">承認フローへ</a></c:if>
-  <c:if test="${d.has('approvalFlowView')}"><a class="btn btn-outline-secondary btn-sm mr-2 mb-1" href="${base}/approval">承認フロー（参照）</a></c:if>
-  <c:if test="${d.has('pullBack')}">
-    <form method="post" action="${base}/pullBack" class="d-inline mr-2 mb-1" data-confirm="引戻しを行うと申込者の確認用 URL は無効になります。よろしいですか？"><input type="hidden" name="_csrf" value="${csrf}"><input type="hidden" name="rowVersion" value="${a.rowVersion}">
-      <button type="submit" class="btn btn-outline-warning btn-sm">引戻し</button></form>
-  </c:if>
-  <c:if test="${d.has('resendConsent')}">
-    <form method="post" action="${base}/resendConsent" class="d-inline mr-2 mb-1" data-confirm="確認依頼メールを再送します。旧 URL は使えなくなります。よろしいですか？"><input type="hidden" name="_csrf" value="${csrf}"><input type="hidden" name="rowVersion" value="${a.rowVersion}">
-      <button type="submit" class="btn btn-outline-secondary btn-sm">確認依頼メール再送</button></form>
-  </c:if>
-  <c:if test="${d.has('resendExternal')}">
-    <form method="post" action="${base}/resendExternal" class="d-inline mr-2 mb-1" data-confirm="送信エラーの外部連携を再送します。よろしいですか？"><input type="hidden" name="_csrf" value="${csrf}"><input type="hidden" name="rowVersion" value="${a.rowVersion}">
-      <button type="submit" class="btn btn-outline-danger btn-sm">外部連携再送</button></form>
-  </c:if>
-  <c:if test="${d.has('startChange')}">
-    <form method="post" action="${base}/startChange" class="d-inline mr-2 mb-1" data-confirm="契約変更手続きを開始します。審査完了版を複写した新しい版を作成します。よろしいですか？"><input type="hidden" name="_csrf" value="${csrf}"><input type="hidden" name="rowVersion" value="${a.rowVersion}">
-      <button type="submit" class="btn btn-info btn-sm">契約変更手続き</button></form>
-  </c:if>
-  <c:if test="${d.has('additional')}"><a class="btn btn-outline-secondary btn-sm mr-2 mb-1" href="${base}/additional">追加申込</a></c:if>
+  <div>
+    <a class="btn btn-primary btn-sm" href="${ctx}/emp/applications/${a.applicationId}/menu">申込メニューへ</a>
+    <a class="btn btn-outline-secondary btn-sm" href="${ctx}/emp/applications">一覧へ戻る</a>
+  </div>
 </div>
 
 <div class="row">
@@ -70,7 +34,6 @@
     <c:set var="base" value="${d.showDiff ? d.baseVersion : null}"/>
     <c:set var="curLabel" value="現行版"/><c:set var="baseLabel" value="基準版"/>
     <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
-    <c:set var="base" value="${ctx}/emp/applications/${a.applicationId}"/>
     <div class="small text-muted">確定日時：${app:datetime(cur.confirmedAt)}　複写元：${empty cur.copiedFromVersionNo ? '－' : '第 '.concat(cur.copiedFromVersionNo).concat(' 版')}</div>
   </div>
 </div>

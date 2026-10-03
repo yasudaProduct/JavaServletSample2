@@ -35,6 +35,9 @@ import java.util.Set;
 /** F04 承認申請、F05 承認・差戻し・審査申請。 */
 public class ApprovalService {
 
+    /** 回付先に設定できる最大ステップ数。 */
+    public static final int MAX_STEPS = 5;
+
     private final ApplicationDao applicationDao;
     private final ApprovalRequestDao requestDao;
     private final ApprovalRouteDao routeDao;
@@ -77,6 +80,7 @@ public class ApprovalService {
                 v.setTemplate(routeDao.findTemplate(conn, app.getCompanyDiv(), app.getDeptCd(), type, LocalDate.now()).orElse(null));
                 v.setCandidates(employeeDao.findApproverCandidates(conn, app.getCompanyDiv()));
                 v.setCanOperate(true);
+                resolveInitialRoute(conn, v, app, type, user);
             } else {
                 ApprovalRequest active = requestDao.findActive(conn, applicationId).orElseThrow(TransitionNotAllowedException::new);
                 v.setActiveRequest(active);
@@ -88,6 +92,44 @@ public class ApprovalService {
             }
             return v;
         });
+    }
+
+    /**
+     * 回付先の初期値：同じ申込・同じ承認種別の前回の申請 → この担当者が同じ承認種別で前回使った回付先 → 承認ルートマスタのテンプレート の順に採用する。
+     * 無効になった社員・承認者権限を失った社員・会社区分の異なる社員は除く（候補にないため）。
+     */
+    private void resolveInitialRoute(Connection conn, ApprovalFlowView v, Application app, String type, LoginUser user) {
+        Set<Long> candidateIds = new HashSet<>();
+        for (Employee e : v.getCandidates()) {
+            candidateIds.add(e.getEmployeeId());
+        }
+        ApprovalRequest last = requestDao.findLatestForApplication(conn, app.getApplicationId(), type).orElse(null);
+        String source = "前回の申請（この申込）";
+        if (last == null) {
+            last = requestDao.findLatestByRequester(conn, user.getEmployeeId(), type).orElse(null);
+            source = "前回の申請（担当者が最後に使った回付先）";
+        }
+        List<Long> ids = new ArrayList<>();
+        if (last != null) {
+            for (ApprovalStep st : last.getSteps()) {
+                if (candidateIds.contains(st.getApproverEmployeeId()) && !ids.contains(st.getApproverEmployeeId())) {
+                    ids.add(st.getApproverEmployeeId());
+                }
+            }
+        }
+        if (ids.isEmpty()) {
+            source = v.getTemplate() == null ? "（初期値なし）" : "テンプレート：" + v.getTemplate().getRouteName();
+            for (Long id : templateApproverIds(v.getTemplate())) {
+                if (candidateIds.contains(id) && !ids.contains(id)) {
+                    ids.add(id);
+                }
+            }
+        }
+        if (ids.size() > MAX_STEPS) {
+            ids = new ArrayList<>(ids.subList(0, MAX_STEPS));
+        }
+        v.setInitialApproverIds(ids);
+        v.setRouteSource(source);
     }
 
     /** F04 申請。回付先ありは承認申請と明細を作って F14 03（条件 11）、回付先なし（一次承認のみ）は承認済の申請を作って F14 03（条件 12）。 */
@@ -110,6 +152,9 @@ public class ApprovalService {
             List<Long> ids = approverIds == null ? new ArrayList<>() : approverIds;
             if (ids.isEmpty() && Codes.isFinalApprovalType(type)) {
                 throw new BusinessException("E109");
+            }
+            if (ids.size() > MAX_STEPS) {
+                throw new BusinessException("E112", MAX_STEPS);
             }
             // 回付先の検証：有効・権限 02・会社区分一致・重複なし
             Set<Long> seen = new HashSet<>();

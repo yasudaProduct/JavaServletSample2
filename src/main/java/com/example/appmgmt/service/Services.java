@@ -23,6 +23,7 @@ import com.example.appmgmt.service.application.ApplicationQueryService;
 import com.example.appmgmt.service.application.ApplicationService;
 import com.example.appmgmt.service.application.ImportService;
 import com.example.appmgmt.service.approval.ApprovalService;
+import com.example.appmgmt.service.auth.ApplicantAuthService;
 import com.example.appmgmt.service.auth.AuthService;
 import com.example.appmgmt.service.consent.ConsentIssuer;
 import com.example.appmgmt.service.consent.ConsentService;
@@ -54,6 +55,7 @@ public final class Services {
 
     private final NotificationService notificationService;
     private final ConsentIssuer consentIssuer;
+    private final ApplicantAuthService applicantAuthService;
     private final StatusTransitionService statusTransitionService;
     private final ApplicationQueryService applicationQueryService;
     private final ApplicationService applicationService;
@@ -72,10 +74,11 @@ public final class Services {
     private Services(AppConfig config) {
         notificationService = new NotificationService(notificationDao, employeeDao, applicantDao, statusDao);
         consentIssuer = new ConsentIssuer(applicantConsentDao, notificationService);
+        applicantAuthService = new ApplicantAuthService(applicantDao, notificationService);
         statusTransitionService = new StatusTransitionService(applicationDao, applicationVersionDao, companyDivDao, statusTransitionDao, statusHistoryDao,
-                approvalRequestDao, applicantConsentDao, externalLinkDao, notificationService, consentIssuer);
+                approvalRequestDao, applicantConsentDao, externalLinkDao, notificationService, consentIssuer, applicantAuthService);
         applicationQueryService = new ApplicationQueryService(applicationDao, applicationVersionDao, applicantDao, employeeDao, statusDao, companyDivDao,
-                approvalRequestDao, applicantConsentDao, externalLinkDao, statusHistoryDao);
+                approvalRequestDao, applicantConsentDao, externalLinkDao, statusHistoryDao, statusTransitionDao);
         applicationService = new ApplicationService(applicationDao, applicationVersionDao, applicantDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer);
         importService = new ImportService(applicationDao, applicationVersionDao, applicantDao, importBatchDao, statusHistoryDao);
         approvalService = new ApprovalService(applicationDao, approvalRequestDao, approvalRouteDao, employeeDao, applicationQueryService, statusTransitionService, notificationService);
@@ -118,6 +121,7 @@ public final class Services {
     public StatusHistoryDao getStatusHistoryDao() { return statusHistoryDao; }
     public NotificationService getNotificationService() { return notificationService; }
     public ConsentIssuer getConsentIssuer() { return consentIssuer; }
+    public ApplicantAuthService getApplicantAuthService() { return applicantAuthService; }
     public StatusTransitionService getStatusTransitionService() { return statusTransitionService; }
     public ApplicationQueryService getApplicationQueryService() { return applicationQueryService; }
     public ApplicationService getApplicationService() { return applicationService; }

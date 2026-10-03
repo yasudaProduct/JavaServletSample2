@@ -231,6 +231,16 @@ public class ApplicationService {
         });
     }
 
+    // ---------------------------------------------------------------- 取消（操作コード 15）
+
+    /** 申込取消（→ 90101）または契約変更の取消（→ 10701／20701）。遷移可否は遷移マスタに従う。 */
+    public TransitionResult cancel(long applicationId, int rowVersion, String reason, LoginUser user) {
+        return Tx.execute(conn -> {
+            load(conn, applicationId, rowVersion, user, null);
+            return transitionService.transition(conn, TransitionRequest.of(applicationId, rowVersion, Codes.ACTION_CANCEL, Codes.ACTOR_OWNER, actor(user)).comment(reason));
+        });
+    }
+
     // ---------------------------------------------------------------- F12 契約変更
 
     /** 契約変更手続きの開始（10701／20701 → 20101）。後続処理で審査完了版を複写した版が作られる。 */

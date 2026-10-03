@@ -5,6 +5,7 @@ import com.example.appmgmt.common.BusinessException;
 import com.example.appmgmt.common.ForbiddenException;
 import com.example.appmgmt.common.Messages;
 import com.example.appmgmt.common.TokenUtil;
+import com.example.appmgmt.domain.ApplicantUser;
 import com.example.appmgmt.domain.LoginUser;
 import com.example.appmgmt.service.Services;
 import java.io.IOException;
@@ -28,6 +29,7 @@ public abstract class BaseServlet extends HttpServlet {
     private static final Logger log = LoggerFactory.getLogger(BaseServlet.class);
     protected static final String VIEW_ROOT = "/WEB-INF/views/";
     public static final String SESSION_USER = "loginUser";
+    public static final String SESSION_APPLICANT = "loginApplicant";
     public static final String SESSION_CSRF = "csrfToken";
     public static final String SESSION_FLASH = "flashMessages";
 
@@ -60,6 +62,19 @@ public abstract class BaseServlet extends HttpServlet {
             throw new ForbiddenException();
         }
         return u;
+    }
+
+    protected ApplicantUser applicant(HttpServletRequest req) {
+        HttpSession s = req.getSession(false);
+        return s == null ? null : (ApplicantUser) s.getAttribute(SESSION_APPLICANT);
+    }
+
+    protected ApplicantUser requireApplicant(HttpServletRequest req) {
+        ApplicantUser a = applicant(req);
+        if (a == null) {
+            throw new ForbiddenException();
+        }
+        return a;
     }
 
     public static String csrfToken(HttpServletRequest req) {
@@ -111,6 +126,7 @@ public abstract class BaseServlet extends HttpServlet {
             }
         }
         req.setAttribute("user", user(req));
+        req.setAttribute("applicantUser", applicant(req));
         req.setAttribute("csrf", csrfToken(req));
         req.setAttribute("ctx", req.getContextPath());
         res.setContentType("text/html; charset=UTF-8");
@@ -186,7 +202,8 @@ public abstract class BaseServlet extends HttpServlet {
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         LoginUser u = user(req);
-        AuditContext.set(u == null ? "ANONYMOUS" : AuditContext.employee(u.getEmployeeId()));
+        ApplicantUser a = applicant(req);
+        AuditContext.set(u != null ? AuditContext.employee(u.getEmployeeId()) : a != null ? AuditContext.applicant(a.getApplicantId()) : "ANONYMOUS");
         try {
             super.service(req, res);
         } catch (BusinessException e) {

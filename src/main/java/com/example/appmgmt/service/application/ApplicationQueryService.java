@@ -12,6 +12,7 @@ import com.example.appmgmt.dao.EmployeeDao;
 import com.example.appmgmt.dao.ExternalLinkDao;
 import com.example.appmgmt.dao.StatusDao;
 import com.example.appmgmt.dao.StatusHistoryDao;
+import com.example.appmgmt.dao.StatusTransitionDao;
 import com.example.appmgmt.domain.Applicant;
 import com.example.appmgmt.domain.Application;
 import com.example.appmgmt.domain.ApplicationListRow;
@@ -43,9 +44,11 @@ public class ApplicationQueryService {
     private final ApplicantConsentDao consentDao;
     private final ExternalLinkDao externalLinkDao;
     private final StatusHistoryDao historyDao;
+    private final StatusTransitionDao transitionDao;
 
     public ApplicationQueryService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantDao applicantDao, EmployeeDao employeeDao, StatusDao statusDao,
-                                   CompanyDivDao companyDivDao, ApprovalRequestDao approvalRequestDao, ApplicantConsentDao consentDao, ExternalLinkDao externalLinkDao, StatusHistoryDao historyDao) {
+                                   CompanyDivDao companyDivDao, ApprovalRequestDao approvalRequestDao, ApplicantConsentDao consentDao, ExternalLinkDao externalLinkDao, StatusHistoryDao historyDao,
+                                   StatusTransitionDao transitionDao) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
         this.applicantDao = applicantDao;
@@ -56,6 +59,7 @@ public class ApplicationQueryService {
         this.consentDao = consentDao;
         this.externalLinkDao = externalLinkDao;
         this.historyDao = historyDao;
+        this.transitionDao = transitionDao;
     }
 
     public static class SearchResult {
@@ -210,7 +214,13 @@ public class ApplicationQueryService {
             }
         }
         if (owner) {
-            a.add("additional");
+            if (!StatusCd.isCanceled(st)) {
+                a.add("additional");
+            }
+            // 取消（操作コード 15）は遷移マスタに該当行があるステータスだけ
+            if (!transitionDao.findCandidates(conn, st, Codes.ACTION_CANCEL, d.getCompanyDiv().getPreCheckFlg()).isEmpty()) {
+                a.add(StatusCd.isContractChange(st) ? "cancelChange" : "cancel");
+            }
             switch (st) {
                 case StatusCd.IMPORTED: a.add("confirm"); break;
                 case StatusCd.INPUT: a.add("input"); break;
@@ -237,6 +247,22 @@ public class ApplicationQueryService {
             a.add("resendExternal");
         }
         return a;
+    }
+
+    /** 申込者ポータル：申込者の申込一覧。 */
+    public List<Application> applicationsOfApplicant(long applicantId) {
+        return Tx.execute(conn -> applicationDao.findByApplicant(conn, applicantId));
+    }
+
+    /** 申込者ポータル：申込者本人の申込であることを確認して詳細を組み立てる（ボタン制御なし）。 */
+    public ApplicationDetail detailForApplicant(long applicationId, long applicantId) {
+        return Tx.execute(conn -> {
+            Application app = applicationDao.findById(conn, applicationId).orElseThrow(ForbiddenException::new);
+            if (app.getApplicantId() != applicantId) {
+                throw new ForbiddenException();
+            }
+            return detail(conn, applicationId, null, true);
+        });
     }
 
     public ApplicationVersion currentVersion(Connection conn, Application app) {

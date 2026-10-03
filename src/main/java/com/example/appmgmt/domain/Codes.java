@@ -42,6 +42,7 @@ public final class Codes {
     public static final String ACTION_REVIEW_COMPLETED = "12";
     public static final String ACTION_REVIEW_RETURNED = "13";
     public static final String ACTION_CHANGE_START = "14";
+    public static final String ACTION_CANCEL = "15";
 
     // 条件コード
     public static final String COND_NONE = "00";
@@ -117,6 +118,7 @@ public final class Codes {
     public static final String NOTIFY_PRECHECK_RESULT = "05";
     public static final String NOTIFY_REVIEW_RESULT = "06";
     public static final String NOTIFY_SEND_ERROR = "07";
+    public static final String NOTIFY_APPLICANT_ACCOUNT = "08";
 
     public static final String FLG_ON = "1";
     public static final String FLG_OFF = "0";
@@ -129,7 +131,7 @@ public final class Codes {
         put("ACTOR", "1", "担当者", "2", "承認者", "3", "申込者", "4", "審査担当部門", "9", "なし");
         put("ACTION", "00", "新規作成", "01", "修正", "02", "確定", "03", "申請", "04", "承認", "05", "差戻し", "06", "引戻し",
                 "07", "同意", "08", "申込者差戻し", "09", "審査申請", "10", "事前確認OK", "11", "事前確認NG", "12", "審査完了",
-                "13", "審査差戻し", "14", "契約変更開始");
+                "13", "審査差戻し", "14", "契約変更開始", "15", "取消");
         put("CONDITION", "00", "なし", "11", "回付先あり", "12", "回付先なし", "21", "変更基準超", "41", "初回の契約変更", "42", "2回目以降の契約変更");
         put("APPROVAL_TYPE", "01", "一次承認", "02", "最終承認", "03", "契約変更一次承認", "04", "契約変更最終承認");
         put("REQUEST_STATUS", "1", "申請中", "2", "承認済", "3", "差戻し");
@@ -142,7 +144,7 @@ public final class Codes {
         put("SEND_STATUS", "0", "未送信", "1", "送信済", "2", "送信エラー");
         put("EXT_RESULT", "1", "問題なし", "2", "修正必要", "3", "審査完了", "4", "審査差戻し");
         put("NOTIFICATION_TYPE", "01", "申込者確認依頼", "02", "承認依頼", "03", "差戻し通知", "04", "申込者差戻し通知",
-                "05", "事前確認結果通知", "06", "審査結果通知", "07", "送信エラー通知");
+                "05", "事前確認結果通知", "06", "審査結果通知", "07", "送信エラー通知", "08", "申込者アカウント通知");
         put("FLG", "1", "あり", "0", "なし");
     }
 

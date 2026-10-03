@@ -92,6 +92,8 @@
       var id = parseInt(sel.value, 10);
       if (!id) { return; }
       if (state.indexOf(id) >= 0) { window.alert('同じ社員は重複して設定できません。'); return; }
+      var max = parseInt(routeTable.getAttribute('data-max') || '5', 10);
+      if (state.length >= max) { window.alert('回付先は ' + max + ' 人までです。'); return; }
       state.push(id);
       render();
     });

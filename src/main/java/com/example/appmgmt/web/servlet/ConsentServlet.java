@@ -22,9 +22,11 @@ public class ConsentServlet extends BaseServlet {
     }
 
     private ConsentView resolve(HttpServletRequest req, HttpServletResponse res, String token) throws ServletException, IOException {
-        ConsentView v = services().getConsentService().resolve(token);
+        ConsentView v = services().getConsentService().resolve(services().getConsentService().byToken(token));
         req.setAttribute("v", v);
         req.setAttribute("token", token);
+        req.setAttribute("consentBase", "/consent/" + token);
+        req.setAttribute("portal", false);
         if (v.getApplication() != null) {
             AuditContext.set(AuditContext.applicant(v.getApplication().getApplicantId()));
         }
@@ -125,7 +127,7 @@ public class ConsentServlet extends BaseServlet {
                     render(req, res, "consent/ap02_edit.jsp");
                     return;
                 }
-                services().getConsentService().saveEdit(token, form.toVersion());
+                services().getConsentService().saveEdit(services().getConsentService().byToken(token), form.toVersion());
                 flashMessage(req, "success", "I001");
                 redirect(req, res, base);
                 return;
@@ -134,7 +136,7 @@ public class ConsentServlet extends BaseServlet {
                 if (!"1".equals(param(req, "checked"))) {
                     throw new BusinessException("E001", "内容を確認しました");
                 }
-                services().getConsentService().confirm(token, ip);
+                services().getConsentService().confirm(services().getConsentService().byToken(token), ip);
                 redirect(req, res, base + "/agree");
                 return;
             case "agree": {
@@ -144,7 +146,7 @@ public class ConsentServlet extends BaseServlet {
                         if (!"1".equals(param(req, "agreed"))) {
                             throw new BusinessException("E001", "同意事項に同意します");
                         }
-                        services().getConsentService().agree(token, ip);
+                        services().getConsentService().agree(services().getConsentService().byToken(token), ip);
                         flashMessage(req, "success", "I007");
                         req.getSession(true).setAttribute("consentDone", "agree");
                         redirect(req, res, base + "/complete");
@@ -154,14 +156,14 @@ public class ConsentServlet extends BaseServlet {
                         if (reason.length() > 500) {
                             throw new BusinessException("E002", "差戻し理由", 500);
                         }
-                        services().getConsentService().returnToOwner(token, reason, ip);
+                        services().getConsentService().returnToOwner(services().getConsentService().byToken(token), reason, ip);
                         flashMessage(req, "info", "I008");
                         req.getSession(true).setAttribute("consentDone", "return");
                         redirect(req, res, base + "/complete");
                         return;
                     }
                     case "modify":
-                        services().getConsentService().modify(token, ip);
+                        services().getConsentService().modify(services().getConsentService().byToken(token), ip);
                         redirect(req, res, base);
                         return;
                     default:

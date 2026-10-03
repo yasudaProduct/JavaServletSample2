@@ -8,8 +8,24 @@
 <link rel="stylesheet" href="${ctx}/static/css/app.css">
 </head>
 <body class="bg-light">
-<nav class="navbar navbar-dark bg-primary"><span class="navbar-brand mb-0 h1">申込管理システム</span></nav>
-<main class="container py-4" style="max-width: 860px;">
+<nav class="navbar navbar-expand navbar-dark bg-primary">
+  <c:choose>
+    <c:when test="${portal and not empty applicantUser}"><a class="navbar-brand" href="${ctx}/my/menu">申込管理システム</a></c:when>
+    <c:otherwise><span class="navbar-brand mb-0 h1">申込管理システム</span></c:otherwise>
+  </c:choose>
+  <c:if test="${portal and not empty applicantUser}">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item"><a class="nav-link" href="${ctx}/my/menu">メニュー</a></li>
+      <li class="nav-item"><a class="nav-link" href="${ctx}/my/menu?tab=notice">お知らせ</a></li>
+    </ul>
+    <span class="navbar-text mr-3 text-white"><c:out value="${applicantUser.applicantName}"/> 様（<c:out value="${applicantUser.applicantNo}"/>）</span>
+    <form method="post" action="${ctx}/my/logout" class="form-inline">
+      <input type="hidden" name="_csrf" value="${csrf}">
+      <button type="submit" class="btn btn-outline-light btn-sm">ログアウト</button>
+    </form>
+  </c:if>
+</nav>
+<main class="container py-4" style="max-width: ${portal ? '1040px' : '860px'};">
   <h1 class="h4 mb-3"><c:out value="${pageTitle}"/></h1>
   <c:forEach var="m" items="${messages}">
     <div class="alert alert-${m.level}" role="alert"><c:out value="${m.text}"/></div>

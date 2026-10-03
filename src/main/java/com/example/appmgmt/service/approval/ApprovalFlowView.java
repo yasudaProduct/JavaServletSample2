@@ -21,6 +21,8 @@ public class ApprovalFlowView {
     private boolean canOperate;
     private boolean currentIsFinalStep;
     private List<ApprovalRequest> history = new ArrayList<>();
+    private List<Long> initialApproverIds = new ArrayList<>();
+    private String routeSource = "";
 
     public ApplicationDetail getDetail() { return detail; }
     public void setDetail(ApplicationDetail detail) { this.detail = detail; }
@@ -44,4 +46,9 @@ public class ApprovalFlowView {
     public void setCurrentIsFinalStep(boolean currentIsFinalStep) { this.currentIsFinalStep = currentIsFinalStep; }
     public List<ApprovalRequest> getHistory() { return history; }
     public void setHistory(List<ApprovalRequest> history) { this.history = history; }
+    public List<Long> getInitialApproverIds() { return initialApproverIds; }
+    public void setInitialApproverIds(List<Long> initialApproverIds) { this.initialApproverIds = initialApproverIds; }
+    /** 回付先の初期値の出所（前回の申請／担当者の前回の申請／テンプレート／なし）。 */
+    public String getRouteSource() { return routeSource; }
+    public void setRouteSource(String routeSource) { this.routeSource = routeSource; }
 }

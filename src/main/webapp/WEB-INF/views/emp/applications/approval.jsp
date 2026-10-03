@@ -15,7 +15,7 @@
     <c:choose>
       <c:when test="${v.modeName == 'WAIT'}">
         <h3 class="h6 section-title">回付先の設定</h3>
-        <p class="small text-muted mb-2">テンプレート：<c:out value="${empty v.template ? '（テンプレートなし）' : v.template.routeName}"/><c:if test="${not empty v.template}">（適用開始日 ${app:date(v.template.validFrom)}）</c:if>
+        <p class="small text-muted mb-2">初期値：<c:out value="${v.routeSource}"/>　／　テンプレート：<c:out value="${empty v.template ? '（テンプレートなし）' : v.template.routeName}"/><c:if test="${not empty v.template}">（適用開始日 ${app:date(v.template.validFrom)}）</c:if>　／　設定できる階層は ${maxSteps} までです。
           <c:if test="${v.finalApproval}"><br><span class="text-danger">最終承認は回付先を 1 人以上設定してください。最終承認者の操作は「審査申請」になります。</span></c:if>
           <c:if test="${not v.finalApproval}"><br>一次承認は回付先なしで申請でき、その場合は承認を省略して申込者確認へ進みます。</c:if></p>
         <form method="post" action="${ctx}/emp/applications/${a.applicationId}/approval" id="applyForm">
@@ -25,7 +25,7 @@
           <input type="hidden" name="templateUsed" id="templateUsed" value="0">
           <table class="table table-sm table-bordered route-table">
             <thead class="thead-light"><tr><th style="width: 12%;">ステップ</th><th>承認者（部署）</th><th style="width: 36%;"></th></tr></thead>
-            <tbody id="routeRows"></tbody>
+            <tbody id="routeRows" data-max="${maxSteps}"></tbody>
           </table>
           <div class="form-inline mb-2">
             <select class="form-control form-control-sm mr-2" id="candidateSelect">
@@ -37,7 +37,7 @@
           </div>
           <p class="small">最終承認者：<strong id="finalApproverName">－</strong></p>
           <button type="submit" name="action" value="apply" class="btn btn-success mr-2">申請</button>
-          <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}">戻る</a>
+          <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
         </form>
         <script type="application/json" id="routeCandidates">[<c:forEach var="e" items="${v.candidates}" varStatus="st">{"id":${e.employeeId},"name":"${fn:escapeXml(e.employeeName)}","dept":"${fn:escapeXml(e.deptCd)}"}${st.last ? '' : ','}</c:forEach>]</script>
         <script type="application/json" id="routeInitial">[<c:forEach var="id" items="${initialApproverIds}" varStatus="st">${id}${st.last ? '' : ','}</c:forEach>]</script>
@@ -72,12 +72,12 @@
               </c:otherwise>
             </c:choose>
             <button type="submit" name="action" value="return" class="btn btn-warning mr-2">差戻し</button>
-            <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}">戻る</a>
+            <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
           </form>
         </c:if>
         <c:if test="${not v.canOperate}">
           <p class="text-muted small">現在ステップの承認者ではないため参照のみです。</p>
-          <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}">戻る</a>
+          <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
         </c:if>
       </c:otherwise>
     </c:choose>

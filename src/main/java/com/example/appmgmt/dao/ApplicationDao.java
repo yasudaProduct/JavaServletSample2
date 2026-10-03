@@ -41,6 +41,11 @@ public class ApplicationDao extends AbstractDao {
         return queryOne(conn, SELECT + " WHERE APPLICATION_ID = ?", ApplicationDao::map, applicationId);
     }
 
+    /** 申込者の申込一覧（更新日時の降順）。申込者ポータルで使う。 */
+    public List<Application> findByApplicant(Connection conn, long applicantId) {
+        return query(conn, SELECT + " WHERE APPLICANT_ID = ? ORDER BY UPDATED_AT DESC, APPLICATION_ID DESC", ApplicationDao::map, applicantId);
+    }
+
     /** 申込番号を採番する（AP ＋ 10 桁ゼロ埋め）。 */
     public String nextApplicationNo(Connection conn) {
         long seq = queryLong(conn, "SELECT NEXT VALUE FOR SEQ_APPLICATION_NO");

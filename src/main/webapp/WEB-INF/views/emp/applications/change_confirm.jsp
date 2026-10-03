@@ -22,6 +22,6 @@
   <input type="hidden" name="rowVersion" value="${a.rowVersion}">
   <button type="submit" name="action" value="modify" class="btn btn-outline-primary mr-2">修正</button>
   <c:if test="${canConfirm and not noChange}"><button type="submit" name="action" value="confirm" class="btn btn-primary mr-2">確定</button></c:if>
-  <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}">戻る</a>
+  <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
 </form>
 <%@ include file="/WEB-INF/views/common/emp_bottom.jspf" %>

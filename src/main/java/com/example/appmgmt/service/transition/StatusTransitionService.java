@@ -22,6 +22,7 @@ import com.example.appmgmt.domain.ExternalLink;
 import com.example.appmgmt.domain.StatusCd;
 import com.example.appmgmt.domain.StatusHistory;
 import com.example.appmgmt.domain.StatusTransition;
+import com.example.appmgmt.service.auth.ApplicantAuthService;
 import com.example.appmgmt.service.consent.ConsentIssuer;
 import com.example.appmgmt.service.notification.NotificationService;
 import java.math.BigDecimal;
@@ -49,10 +50,11 @@ public class StatusTransitionService {
     private final ExternalLinkDao externalLinkDao;
     private final NotificationService notificationService;
     private final ConsentIssuer consentIssuer;
+    private final ApplicantAuthService applicantAuthService;
 
     public StatusTransitionService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, CompanyDivDao companyDivDao, StatusTransitionDao transitionDao,
                                    StatusHistoryDao historyDao, ApprovalRequestDao approvalRequestDao, ApplicantConsentDao consentDao, ExternalLinkDao externalLinkDao,
-                                   NotificationService notificationService, ConsentIssuer consentIssuer) {
+                                   NotificationService notificationService, ConsentIssuer consentIssuer, ApplicantAuthService applicantAuthService) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
         this.companyDivDao = companyDivDao;
@@ -63,6 +65,7 @@ public class StatusTransitionService {
         this.externalLinkDao = externalLinkDao;
         this.notificationService = notificationService;
         this.consentIssuer = consentIssuer;
+        this.applicantAuthService = applicantAuthService;
     }
 
     public TransitionResult transition(Connection conn, TransitionRequest req) {
@@ -235,8 +238,9 @@ public class StatusTransitionService {
                 break;
             }
             case 6: case 8: case 35: case 37: {
-                // 内容確認待ちへ：申込者同意を作成し確認依頼を登録
+                // 内容確認待ちへ：申込者同意を作成し確認依頼を登録。初めて一次承認が通った申込者にはポータルのアカウントを発行する
                 consentIssuer.issue(conn, app, change ? Codes.CONSENT_TYPE_CHANGE : Codes.CONSENT_TYPE_NEW);
+                applicantAuthService.issueIfNeeded(conn, app);
                 break;
             }
             case 9: case 11: case 38: case 40:
@@ -292,6 +296,20 @@ public class StatusTransitionService {
                 applicationDao.updateVersions(conn, app);
                 consentDao.invalidateActive(conn, app.getApplicationId());
                 notificationService.registerReviewReturned(conn, app, req.getComment(), true);
+                break;
+            }
+            case 56: case 57: case 58: case 59: case 60: case 61: case 62:
+                // 申込取消：進行中の申込者同意を無効にする
+                consentDao.invalidateActive(conn, app.getApplicationId());
+                break;
+            case 63: case 64: case 65: case 66: case 67: case 68: case 69: case 70: case 71: case 72: case 73: case 74: {
+                // 契約変更の取消：F13 と同じく契約変更で作った版を取り消し、現行版・基準版を審査完了版へ戻す
+                int reviewed = app.getReviewedVersionNo();
+                versionDao.cancelAfter(conn, app.getApplicationId(), reviewed);
+                app.setCurrentVersionNo(reviewed);
+                app.setBaseVersionNo(reviewed);
+                applicationDao.updateVersions(conn, app);
+                consentDao.invalidateActive(conn, app.getApplicationId());
                 break;
             }
             case 29: case 55: {

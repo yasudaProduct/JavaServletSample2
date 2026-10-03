@@ -46,7 +46,7 @@
   <div class="mt-3">
     <button type="submit" name="action" value="save" class="btn btn-outline-primary mr-2">一時保存</button>
     <button type="submit" name="action" value="confirm" class="btn btn-primary mr-2">確認へ</button>
-    <a class="btn btn-outline-secondary" href="${empty d ? (empty sourceApplication ? ctx.concat('/emp/applications') : ctx.concat('/emp/applications/').concat(sourceApplication.applicationId)) : ctx.concat('/emp/applications/').concat(d.application.applicationId)}">戻る</a>
+    <a class="btn btn-outline-secondary" href="${empty d ? (empty sourceApplication ? ctx.concat('/emp/applications') : ctx.concat('/emp/applications/').concat(sourceApplication.applicationId).concat('/menu')) : ctx.concat('/emp/applications/').concat(d.application.applicationId).concat('/menu')}">戻る</a>
   </div>
 </form>
 <%@ include file="/WEB-INF/views/common/emp_bottom.jspf" %>

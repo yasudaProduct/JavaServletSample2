@@ -52,6 +52,19 @@
     <filter-name>csrfFilter</filter-name>
     <url-pattern>/consent/*</url-pattern>
   </filter-mapping>
+  <filter-mapping>
+    <filter-name>csrfFilter</filter-name>
+    <url-pattern>/my/*</url-pattern>
+  </filter-mapping>
+
+  <filter>
+    <filter-name>applicantAuthFilter</filter-name>
+    <filter-class>com.example.appmgmt.web.filter.ApplicantAuthFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>applicantAuthFilter</filter-name>
+    <url-pattern>/my/*</url-pattern>
+  </filter-mapping>
 
   <filter>
     <filter-name>apiAuthFilter</filter-name>
@@ -121,6 +134,15 @@
   <servlet-mapping>
     <servlet-name>consent</servlet-name>
     <url-pattern>/consent/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>my</servlet-name>
+    <servlet-class>com.example.appmgmt.web.servlet.MyServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>my</servlet-name>
+    <url-pattern>/my/*</url-pattern>
   </servlet-mapping>
 
   <servlet>

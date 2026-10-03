@@ -79,6 +79,22 @@ public class ApprovalRequestDao extends AbstractDao {
         return list;
     }
 
+    /** 同じ申込・同じ承認種別の直近の承認申請（回付先ありのもの）。再申請時の回付先の初期値に使う。 */
+    public Optional<ApprovalRequest> findLatestForApplication(Connection conn, long applicationId, String approvalType) {
+        Optional<ApprovalRequest> r = queryOne(conn, SELECT + " WHERE r.APPLICATION_ID = ? AND r.APPROVAL_TYPE = ? AND r.FINAL_STEP_NO IS NOT NULL ORDER BY r.APPROVAL_REQUEST_ID DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY",
+                ApprovalRequestDao::map, applicationId, approvalType);
+        r.ifPresent(x -> x.setSteps(findSteps(conn, x.getApprovalRequestId())));
+        return r;
+    }
+
+    /** 同じ申請社員・同じ承認種別の直近の承認申請（回付先ありのもの）。担当者が前回使った回付先の初期値に使う。 */
+    public Optional<ApprovalRequest> findLatestByRequester(Connection conn, long requestEmployeeId, String approvalType) {
+        Optional<ApprovalRequest> r = queryOne(conn, SELECT + " WHERE r.REQUEST_EMPLOYEE_ID = ? AND r.APPROVAL_TYPE = ? AND r.FINAL_STEP_NO IS NOT NULL ORDER BY r.APPROVAL_REQUEST_ID DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY",
+                ApprovalRequestDao::map, requestEmployeeId, approvalType);
+        r.ifPresent(x -> x.setSteps(findSteps(conn, x.getApprovalRequestId())));
+        return r;
+    }
+
     public List<ApprovalStep> findSteps(Connection conn, long requestId) {
         return query(conn, SELECT_STEP + " WHERE s.APPROVAL_REQUEST_ID = ? ORDER BY s.STEP_NO", ApprovalRequestDao::mapStep, requestId);
     }

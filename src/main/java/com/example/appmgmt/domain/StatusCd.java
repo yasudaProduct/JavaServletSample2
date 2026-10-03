@@ -31,6 +31,7 @@ public final class StatusCd {
     public static final String CHG_FINAL_IN_PROGRESS = "20502";
     public static final String CHG_REVIEWING = "20601";
     public static final String CHG_REVIEWED = "20701";
+    public static final String CANCELED = "90101";
 
     public static final Set<String> APPROVAL_WAIT = Set.of(PRIMARY_WAIT, FINAL_WAIT, CHG_PRIMARY_WAIT, CHG_FINAL_WAIT);
     public static final Set<String> APPROVAL_IN_PROGRESS = Set.of(PRIMARY_IN_PROGRESS, FINAL_IN_PROGRESS, CHG_PRIMARY_IN_PROGRESS, CHG_FINAL_IN_PROGRESS);
@@ -45,5 +46,9 @@ public final class StatusCd {
 
     public static boolean isContractChange(String statusCd) {
         return statusCd != null && statusCd.startsWith("2");
+    }
+
+    public static boolean isCanceled(String statusCd) {
+        return CANCELED.equals(statusCd);
     }
 }

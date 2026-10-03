@@ -94,7 +94,7 @@
     <c:if test="${empty result.rows}"><tr><td colspan="7" class="text-muted text-center">該当する申込はありません。</td></tr></c:if>
     <c:forEach var="r" items="${result.rows}">
       <tr>
-        <td><a href="${ctx}/emp/applications/${r.applicationId}"><c:out value="${r.applicationNo}"/></a></td>
+        <td><a href="${ctx}/emp/applications/${r.applicationId}/menu"><c:out value="${r.applicationNo}"/></a></td>
         <td><c:out value="${r.applicantNo}"/>／<c:out value="${r.applicantName}"/></td>
         <td><span class="badge badge-${fn:endsWith(r.statusCd, '701') ? 'success' : 'primary'} status-badge">${r.statusCd}</span> <c:out value="${r.statusName}"/></td>
         <td class="text-right">${app:amount(r.totalAmount)}</td>

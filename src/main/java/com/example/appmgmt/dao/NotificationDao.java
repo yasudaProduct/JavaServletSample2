@@ -43,6 +43,12 @@ public class NotificationDao extends AbstractDao {
         return query(conn, SELECT + " ORDER BY n.NOTIFICATION_ID DESC OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY", NotificationDao::map, limit);
     }
 
+    /** 申込者宛の通知（申込者確認依頼、申込者アカウント通知）。申込者ポータルの「お知らせ」に使う。 */
+    public List<Notification> findForApplicant(Connection conn, long applicantId, int limit) {
+        return query(conn, SELECT + " WHERE a.APPLICANT_ID = ? AND n.NOTIFICATION_TYPE IN (?, ?) ORDER BY n.NOTIFICATION_ID DESC OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY",
+                NotificationDao::map, applicantId, Codes.NOTIFY_CONSENT_REQUEST, Codes.NOTIFY_APPLICANT_ACCOUNT, limit);
+    }
+
     public List<Notification> findByApplication(Connection conn, long applicationId) {
         return query(conn, SELECT + " WHERE n.APPLICATION_ID = ? ORDER BY n.NOTIFICATION_ID DESC", NotificationDao::map, applicationId);
     }

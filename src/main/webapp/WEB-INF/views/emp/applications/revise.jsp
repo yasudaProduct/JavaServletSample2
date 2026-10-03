@@ -23,6 +23,6 @@
   <input type="hidden" name="rowVersion" value="${a.rowVersion}">
   <%@ include file="/WEB-INF/views/common/version_fields.jspf" %>
   <button type="submit" class="btn btn-primary mr-2">確定</button>
-  <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}">戻る</a>
+  <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>
 </form>
 <%@ include file="/WEB-INF/views/common/emp_bottom.jspf" %>

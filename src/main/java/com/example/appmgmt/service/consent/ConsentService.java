@@ -21,8 +21,18 @@ import com.example.appmgmt.service.transition.TransitionResult;
 import java.sql.Connection;
 import java.time.LocalDateTime;
 
-/** F07 申込者確認・同意。 */
+/**
+ * F07 申込者確認・同意。
+ * 申込者の特定は 2 通り：確認用 URL のトークン（メールのリンク）と、申込者ポータルにログインした申込者本人（申込 ID で進行中の同意を引く）。
+ * どちらも同じ申込者同意レコードを使い、以降の処理は共通。
+ */
 public class ConsentService {
+
+    /** 申込者同意の解決方法。 */
+    @FunctionalInterface
+    public interface Resolver {
+        ConsentView resolve(Connection conn);
+    }
 
     private final ApplicantConsentDao consentDao;
     private final ApplicationDao applicationDao;
@@ -41,24 +51,49 @@ public class ConsentService {
         this.transitionService = transitionService;
     }
 
-    /** 8.3 トークン検証（全リクエスト共通）。 */
-    public ConsentView resolve(String token) {
-        return Tx.execute(conn -> resolve(conn, token));
+    /** 確認用 URL のトークンで解決する（F07 8.3 トークン検証）。 */
+    public Resolver byToken(String token) {
+        return conn -> {
+            if (!TokenUtil.looksLikeToken(token)) {
+                return invalid();
+            }
+            ApplicantConsent c = consentDao.findByTokenHash(conn, TokenUtil.sha256Hex(token)).orElse(null);
+            return c == null ? invalid() : build(conn, c, null);
+        };
     }
 
-    public ConsentView resolve(Connection conn, String token) {
+    /** ログイン中の申込者本人として、申込の進行中の同意で解決する（申込者ポータル）。 */
+    public Resolver byApplicant(long applicantId, long applicationId) {
+        return conn -> {
+            Application app = applicationDao.findById(conn, applicationId).orElse(null);
+            if (app == null || app.getApplicantId() != applicantId) {
+                throw new ForbiddenException();
+            }
+            ApplicantConsent c = consentDao.findActive(conn, applicationId).orElse(null);
+            if (c == null) {
+                // 進行中の同意がない：完了扱い（申込者確認中でなければお手続きなし）
+                ConsentView v = new ConsentView();
+                v.setApplication(app);
+                v.setApplicant(applicantDao.findById(conn, app.getApplicantId()).orElse(null));
+                v.setStatus(statusDao.find(conn, app.getStatusCd()).orElse(null));
+                v.setVersion(versionDao.find(conn, app.getApplicationId(), app.getCurrentVersionNo()).orElse(null));
+                v.setOutcome(ConsentView.Outcome.COMPLETED);
+                return v;
+            }
+            return build(conn, c, app);
+        };
+    }
+
+    private static ConsentView invalid() {
         ConsentView v = new ConsentView();
-        if (!TokenUtil.looksLikeToken(token)) {
-            v.setOutcome(ConsentView.Outcome.INVALID);
-            return v;
-        }
-        ApplicantConsent c = consentDao.findByTokenHash(conn, TokenUtil.sha256Hex(token)).orElse(null);
-        if (c == null) {
-            v.setOutcome(ConsentView.Outcome.INVALID);
-            return v;
-        }
+        v.setOutcome(ConsentView.Outcome.INVALID);
+        return v;
+    }
+
+    private ConsentView build(Connection conn, ApplicantConsent c, Application appOrNull) {
+        ConsentView v = new ConsentView();
         v.setConsent(c);
-        Application app = applicationDao.findById(conn, c.getApplicationId()).orElse(null);
+        Application app = appOrNull != null ? appOrNull : applicationDao.findById(conn, c.getApplicationId()).orElse(null);
         if (app == null || Codes.CONSENT_INVALID.equals(c.getConsentStatus())) {
             v.setOutcome(ConsentView.Outcome.INVALID);
             return v;
@@ -92,8 +127,12 @@ public class ConsentService {
         return v;
     }
 
-    private ConsentView requireActive(Connection conn, String token) {
-        ConsentView v = resolve(conn, token);
+    public ConsentView resolve(Resolver r) {
+        return Tx.execute(r::resolve);
+    }
+
+    private ConsentView requireActive(Connection conn, Resolver r) {
+        ConsentView v = r.resolve(conn);
         if (v.getOutcome() != ConsentView.Outcome.CONFIRM && v.getOutcome() != ConsentView.Outcome.AGREE) {
             throw new ForbiddenException();
         }
@@ -107,9 +146,9 @@ public class ConsentService {
     }
 
     /** AP02 保存（10301 のみ）。現行版をそのまま更新する。 */
-    public void saveEdit(String token, ApplicationVersion content) {
+    public void saveEdit(Resolver r, ApplicationVersion content) {
         Tx.executeVoid(conn -> {
-            ConsentView v = requireActive(conn, token);
+            ConsentView v = requireActive(conn, r);
             if (!StatusCd.CONFIRM_WAIT.equals(v.getApplication().getStatusCd())) {
                 throw new TransitionNotAllowedException();
             }
@@ -127,9 +166,9 @@ public class ConsentService {
     }
 
     /** AP01 確定（10301／20301 → 10302／20302）。 */
-    public TransitionResult confirm(String token, String ip) {
+    public TransitionResult confirm(Resolver r, String ip) {
         return Tx.execute(conn -> {
-            ConsentView v = requireActive(conn, token);
+            ConsentView v = requireActive(conn, r);
             if (!StatusCd.CONTENT_CONFIRM_WAIT.contains(v.getApplication().getStatusCd())) {
                 throw new TransitionNotAllowedException();
             }
@@ -139,9 +178,9 @@ public class ConsentService {
     }
 
     /** AP03 同意する。 */
-    public TransitionResult agree(String token, String ip) {
+    public TransitionResult agree(Resolver r, String ip) {
         return Tx.execute(conn -> {
-            ConsentView v = requireActive(conn, token);
+            ConsentView v = requireActive(conn, r);
             if (!StatusCd.AGREE_WAIT.contains(v.getApplication().getStatusCd())) {
                 throw new TransitionNotAllowedException();
             }
@@ -150,12 +189,12 @@ public class ConsentService {
     }
 
     /** AP03 差戻し（理由必須）。 */
-    public TransitionResult returnToOwner(String token, String reason, String ip) {
+    public TransitionResult returnToOwner(Resolver r, String reason, String ip) {
         if (reason == null || reason.isBlank()) {
             throw new BusinessException("E105");
         }
         return Tx.execute(conn -> {
-            ConsentView v = requireActive(conn, token);
+            ConsentView v = requireActive(conn, r);
             if (!StatusCd.AGREE_WAIT.contains(v.getApplication().getStatusCd())) {
                 throw new TransitionNotAllowedException();
             }
@@ -164,9 +203,9 @@ public class ConsentService {
     }
 
     /** AP03 修正（10302 のみ → 10301）。 */
-    public TransitionResult modify(String token, String ip) {
+    public TransitionResult modify(Resolver r, String ip) {
         return Tx.execute(conn -> {
-            ConsentView v = requireActive(conn, token);
+            ConsentView v = requireActive(conn, r);
             if (!StatusCd.CONSENT_WAIT.equals(v.getApplication().getStatusCd())) {
                 throw new TransitionNotAllowedException();
             }
