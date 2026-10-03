@@ -15,3 +15,7 @@ table.table-sm td, table.table-sm th { vertical-align: middle; }
 .nav-tabs .nav-link.active { font-weight: bold; }
 .dev-link { opacity: .7; }
 .dev-link:hover { opacity: 1; }
+.version-table td.changed { color: #dc3545; font-weight: bold; }
+.menu-section > .card-header { background: #f1f5fb; }
+.menu-section .tile { margin-bottom: 1rem; }
+.notice-card .mail-body { white-space: pre-wrap; font-size: .85rem; }

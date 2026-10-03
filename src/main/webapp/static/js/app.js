@@ -39,6 +39,17 @@
   document.querySelectorAll('.amount-input').forEach(function (el) { el.addEventListener('input', recalc); });
   recalc();
 
+  // 申込メニューの領域（折りたたみ）：ボタンの文言を状態に合わせる
+  if (window.jQuery) {
+    window.jQuery('.menu-section .collapse').on('shown.bs.collapse', function () {
+      var b = document.querySelector('[data-target="#' + this.id + '"]');
+      if (b) { b.textContent = '折りたたむ'; }
+    }).on('hidden.bs.collapse', function () {
+      var b = document.querySelector('[data-target="#' + this.id + '"]');
+      if (b) { b.textContent = '展開する'; }
+    });
+  }
+
   // 確認ダイアログ
   document.querySelectorAll('form[data-confirm]').forEach(function (f) {
     f.addEventListener('submit', function (e) {

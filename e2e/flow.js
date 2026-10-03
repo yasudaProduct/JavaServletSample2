@@ -106,16 +106,33 @@ async function applyApproval(page, appId, { approvers = null, expectInitial = nu
   await page.click('button[value=apply]'); await page.waitForLoadState('networkidle');
   console.log('    apply:', (await alerts(page)).slice(0, 60));
 }
-// SC14 のタイルは常に同じ並び（活性・非活性だけが変わる）。申込入力へのタイルはなく、SC03 は開発者向けリンクだけ
-const TILE_KEYS = ['confirm', 'revise', 'approval', 'startChange', 'pullBack', 'cancel', 'additional', 'resendConsent', 'resendExternal'];
-async function checkTiles(page, appId, label) {
+// SC14：申込全体のタイル（契約変更・追加申込・メンテナンス）と、手続きごとの領域（新規申込、契約変更 N）。
+// 各領域は常に同じ 7 タイル（活性・非活性だけが変わる）。申込入力へのタイルはなく、SC03 は開発者向けリンクだけ
+const GENERAL_KEYS = ['startChange', 'additional', 'maintenance'];
+const SECTION_KEYS = ['confirm', 'revise', 'approval', 'pullBack', 'cancel', 'resendConsent', 'resendExternal'];
+async function checkTiles(page, appId, label, expectSections = null) {
   await page.goto(BASE + '/emp/applications/' + appId + '/menu');
-  const keys = await page.locator('.tile').evaluateAll(els => els.map(e => e.id.replace('tile-', '')));
-  if (keys.join(',') !== TILE_KEYS.join(',')) throw new Error(`[${label}] tiles = ${keys.join(',')}`);
+  const general = await page.locator('.tile').evaluateAll(els => els.map(e => e.id.replace('tile-', '')).filter(k => !/-g\d+$/.test(k)));
+  if (general.join(',') !== GENERAL_KEYS.join(',')) throw new Error(`[${label}] general tiles = ${general.join(',')}`);
+  const titles = await page.locator('.menu-section .menu-section-title').allTextContents();
+  if (expectSections && titles.join(',') !== expectSections.join(',')) throw new Error(`[${label}] sections = ${titles.join(',')}`);
+  for (let i = 0; i < titles.length; i++) {
+    const keys = await page.locator(`#sec-${i} .tile`).evaluateAll(els => els.map(e => e.id.replace('tile-', '').replace(/-g\d+$/, '')));
+    if (keys.join(',') !== SECTION_KEYS.join(',')) throw new Error(`[${label}] section ${i} tiles = ${keys.join(',')}`);
+  }
   if (await page.locator('#devDetailLink').count() !== 1) throw new Error(`[${label}] developer link missing`);
   if (await page.locator('#tile-detail, #tile-input, #tile-modify, #tile-fullRevise').count() !== 0) throw new Error(`[${label}] unexpected tiles`);
   const enabled = await page.locator('.tile:not(.tile-disabled)').evaluateAll(els => els.map(e => e.id.replace('tile-', '')));
-  console.log(`OK  タイル固定（${label}）: 活性 = ${enabled.join(',')}`);
+  const expanded = await page.locator('.menu-section .collapse.show').evaluateAll(els => els.map(e => e.id.replace('sec-body-', '')));
+  console.log(`OK  メニュー領域（${label}）: ${titles.join('／')}　展開 = ${expanded.join(',')}　活性 = ${enabled.join(',')}`);
+  return titles.length;
+}
+async function passwordResetFor(page, appNo) {
+  await page.goto(BASE + '/emp/dev/notifications');
+  const card = page.locator('.card').filter({ hasText: appNo }).filter({ hasText: 'パスワード初期化通知' }).first();
+  if (await card.count() === 0) throw new Error('password reset notification not found for ' + appNo);
+  const body = await card.locator('.mail-body').textContent();
+  return body.match(/初期パスワード：(\S+)/)[1];
 }
 async function approve(page, appId, action, comment = '') {
   await page.goto(BASE + '/emp/applications/' + appId + '/approval');
@@ -160,7 +177,7 @@ async function portalLogin(apPage, id, pw) {
     if (await page.locator('button[value=apply]').count() !== 0) throw new Error('requester view: apply form should not be submittable');
     console.log('OK  申請者の承認フロー参照（10202）: ' + (await page.locator('#viewNote').textContent()).trim().slice(0, 50));
     await checkTiles(page, a.appId, '10202');
-    if (await page.locator('#tile-pullBack.tile-disabled').count() !== 1) throw new Error('10202: 引戻し should be disabled');
+    if (await page.locator('#tile-pullBack-g0.tile-disabled').count() !== 1) throw new Error('10202: 引戻し should be disabled');
     await logout(page);
 
     await login(page, 'A002'); await shot(page, 'SC02-approver');
@@ -192,6 +209,22 @@ async function portalLogin(apPage, id, pw) {
     await apPage.click('form[action$="/my/logout"] button'); await apPage.waitForURL('**/my/login**');
     await portalLogin(apPage, acct.id, 'NewPassw0rd1'); console.log('OK  申込者ポータル 変更後パスワードでログイン');
     await page.goto(BASE + '/emp/applications/' + a.appId); await expectStatus(page, '10501', '申込者同意（区分1・ポータル）');
+    await logout(page);
+
+    // ---------- SC15 メンテナンス：通知履歴とパスワードの初期化 ----------
+    await login(page, 'A001');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/maintenance'); await shot(page, 'SC15');
+    const noticeCards = await page.locator('.notice-card').count();
+    if (noticeCards < 2) throw new Error('maintenance: expected applicant notices, got ' + noticeCards);
+    page.once('dialog', d => d.accept());
+    await page.click('#resetPasswordBtn'); await page.waitForLoadState('networkidle');
+    console.log('OK  パスワード初期化:', (await alerts(page)).slice(0, 40), '／ 通知履歴', noticeCards, '件');
+    if (await page.locator('.notice-card').filter({ hasText: 'パスワード初期化通知' }).count() !== 1) throw new Error('maintenance: reset notice missing');
+    const resetPw = await passwordResetFor(page, a.appNo);
+    await apPage.click('form[action$="/my/logout"] button'); await apPage.waitForURL('**/my/login**');
+    await apPage.goto(BASE + '/my/login'); await apPage.fill('#loginId', acct.id); await apPage.fill('#password', 'NewPassw0rd1'); await apPage.click('button[type=submit]'); await apPage.waitForLoadState('networkidle');
+    if (!apPage.url().includes('/my/login')) throw new Error('old password should be rejected after reset');
+    await portalLogin(apPage, acct.id, resetPw); console.log('OK  申込者ポータル 初期化後のパスワードでログイン');
     await logout(page);
 
     // 一部修正（基準内）→ 10501 のまま、基準超 → 10201
@@ -272,6 +305,18 @@ async function portalLogin(apPage, id, pw) {
     await mockResult(page, a.appNo, 'COMPLETED');
     await page.goto(BASE + '/emp/applications/' + a.appId); await expectStatus(page, '20701', '契約変更 審査完了'); await shot(page, 'SC03-20701');
     await page.goto(BASE + '/emp/applications/' + a.appId + '/menu'); await shot(page, 'SC14-20701');
+    await checkTiles(page, a.appId, '20701', ['新規申込', '契約変更1', '契約変更2', '契約変更3']);
+    if (await page.locator('#sec-body-3.show').count() !== 1 || await page.locator('#sec-body-0.show').count() !== 0) throw new Error('20701: only the latest section should be expanded');
+    await page.click('#sec-0 .section-toggle'); await page.waitForSelector('#sec-body-0.show'); await shot(page, 'SC14-20701-expanded');
+    console.log('OK  領域の折りたたみ切替: 新規申込を展開 →', (await page.locator('#sec-0 .section-toggle').textContent()).trim());
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/change/confirm?group=1'); await shot(page, 'SC09-group1');
+    if (await page.locator('#modifyBtn:disabled').count() !== 1 || !(await page.title()).includes('契約変更1')) throw new Error('group 1 should be read-only');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/confirm?group=0');
+    if (await page.locator('#modifyBtn:disabled').count() !== 1) throw new Error('group 0 should be read-only after contract change');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/approval?group=3'); await shot(page, 'SC06-group3');
+    const histRows = await page.locator('table').last().locator('tbody tr').count();
+    if (histRows < 1) throw new Error('group 3 approval history should not be empty');
+    console.log('OK  過去の領域の参照（SC05／SC09／SC06）: 契約変更3 の履歴行 =', histRows);
     await logout(page);
 
     // ---------- 申込取消 ----------
@@ -300,7 +345,10 @@ async function portalLogin(apPage, id, pw) {
     page.once('dialog', d => d.accept());
     await page.click('#modifyBtn'); await page.waitForURL('**/edit');
     await page.goto(BASE + '/emp/applications/' + b.appId + '/menu'); await expectStatus(page, '10101', 'B 全体修正（SC05 の修正）');
-    await page.goto(BASE + '/emp/applications/' + b.appId + '/edit'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    await page.goto(BASE + '/emp/applications/' + b.appId + '/edit'); await page.fill('#remarks', '全体修正で備考を変更'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    const changedCells = await page.locator('td.changed').count();
+    if (changedCells < 1) throw new Error('full revise: changed items should be red');
+    console.log('OK  全体修正の変更項目を赤字表示: ' + changedCells + ' 項目'); await shot(page, 'SC05-fullrevise-diff');
     await page.click('button[value=confirm]'); await page.waitForLoadState('networkidle'); await expectStatus(page, '10201', 'B 再確定');
     await applyApproval(page, b.appId, { approvers: [] }); await expectStatus(page, '10301', 'B 回付先なし 2');
     await menuAction(page, b.appId, 'resendConsent'); console.log('    resend:', (await alerts(page)).slice(0, 40));

@@ -1,4 +1,4 @@
-<c:set var="pageTitle" value="SC06 承認フロー"/>
+<c:set var="pageTitle" value="SC06 承認フロー${empty group ? '' : '（'.concat(group.title).concat('）')}"/>
 <c:set var="a" value="${d.application}"/>
 <%@ include file="/WEB-INF/views/common/emp_top.jspf" %>
 <div class="card mb-3"><div class="card-body py-2 small">
@@ -7,8 +7,9 @@
 </div></div>
 <div class="row">
   <div class="col-lg-6">
-    <h3 class="h6 section-title">申込内容（現行版）</h3>
-    <c:set var="cur" value="${d.currentVersion}"/><c:set var="base" value="${d.showDiff ? d.baseVersion : null}"/><c:set var="curLabel" value="現行版"/><c:set var="baseLabel" value="基準版"/>
+    <h3 class="h6 section-title">申込内容（${empty group or group.current ? '現行版' : 'この手続きの最終版'}）</h3>
+    <c:if test="${not empty diffBase}"><p class="small mb-1"><span class="text-danger font-weight-bold">赤字</span>：全体修正で変更した項目（複写元：第 ${diffBase.versionNo} 版）</p></c:if>
+    <c:set var="cur" value="${empty viewVersion ? d.currentVersion : viewVersion}"/><c:set var="base" value="${(empty group or group.current) and d.showDiff ? d.baseVersion : null}"/><c:set var="curLabel" value="${empty group or group.current ? '現行版' : '最終版'}"/><c:set var="baseLabel" value="基準版"/>
     <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
   </div>
   <div class="col-lg-6">

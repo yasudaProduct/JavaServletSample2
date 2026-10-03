@@ -162,6 +162,15 @@ public class NotificationService {
         register(conn, Codes.NOTIFY_APPLICANT_ACCOUNT, app, p.get("applicantMail"), "08.subject", "08.body", p);
     }
 
+    /** 09 パスワード初期化通知（宛先：申込者）。新しい初期パスワードは本文にだけ含める。 */
+    public void registerPasswordReset(Connection conn, Application app, String loginId, String initialPassword) {
+        Map<String, String> p = baseParams(conn, app);
+        p.put("baseUrl", AppConfig.get().getString("app.applicant-base-url"));
+        p.put("loginId", loginId);
+        p.put("initialPassword", initialPassword);
+        register(conn, Codes.NOTIFY_PASSWORD_RESET, app, p.get("applicantMail"), "09.subject", "09.body", p);
+    }
+
     /** 07 送信エラー通知（宛先：担当社員と有効な管理者。重複する宛先は 1 行）。 */
     public void registerSendError(Connection conn, Application app, ExternalLink link) {
         Map<String, String> p = baseParams(conn, app);

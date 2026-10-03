@@ -119,6 +119,7 @@ public final class Codes {
     public static final String NOTIFY_REVIEW_RESULT = "06";
     public static final String NOTIFY_SEND_ERROR = "07";
     public static final String NOTIFY_APPLICANT_ACCOUNT = "08";
+    public static final String NOTIFY_PASSWORD_RESET = "09";
 
     public static final String FLG_ON = "1";
     public static final String FLG_OFF = "0";
@@ -144,7 +145,7 @@ public final class Codes {
         put("SEND_STATUS", "0", "未送信", "1", "送信済", "2", "送信エラー");
         put("EXT_RESULT", "1", "問題なし", "2", "修正必要", "3", "審査完了", "4", "審査差戻し");
         put("NOTIFICATION_TYPE", "01", "申込者確認依頼", "02", "承認依頼", "03", "差戻し通知", "04", "申込者差戻し通知",
-                "05", "事前確認結果通知", "06", "審査結果通知", "07", "送信エラー通知", "08", "申込者アカウント通知");
+                "05", "事前確認結果通知", "06", "審査結果通知", "07", "送信エラー通知", "08", "申込者アカウント通知", "09", "パスワード初期化通知");
         put("FLG", "1", "あり", "0", "なし");
     }
 

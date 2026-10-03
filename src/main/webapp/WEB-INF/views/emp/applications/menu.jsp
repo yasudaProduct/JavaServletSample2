@@ -21,7 +21,27 @@
     </div>
   </div>
 </div>
-<h3 class="h6 section-title">この申込に対する操作</h3>
+<h3 class="h6 section-title">申込全体の操作</h3>
+<c:set var="tiles" value="${generalTiles}"/>
 <%@ include file="/WEB-INF/views/common/menu_tiles.jspf" %>
+<h3 class="h6 section-title">手続きごとの操作</h3>
+<c:forEach var="sec" items="${sections}">
+  <div class="card mb-3 menu-section" id="sec-${sec.id}">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap">
+      <div>
+        <strong class="menu-section-title"><c:out value="${sec.title}"/></strong>
+        <span class="badge badge-${sec.badgeStyle} ml-2"><c:out value="${sec.stateName}"/></span>
+        <span class="small text-muted ml-2"><c:out value="${sec.description}"/></span>
+      </div>
+      <button class="btn btn-outline-secondary btn-sm section-toggle" type="button" data-toggle="collapse" data-target="#sec-body-${sec.id}" aria-expanded="${sec.expanded}" aria-controls="sec-body-${sec.id}">${sec.expanded ? '折りたたむ' : '展開する'}</button>
+    </div>
+    <div class="collapse ${sec.expanded ? 'show' : ''}" id="sec-body-${sec.id}">
+      <div class="card-body pb-0">
+        <c:set var="tiles" value="${sec.tiles}"/>
+        <%@ include file="/WEB-INF/views/common/menu_tiles.jspf" %>
+      </div>
+    </div>
+  </div>
+</c:forEach>
 <p class="text-right mt-4 mb-0"><a class="small text-muted dev-link" id="devDetailLink" href="${ctx}/emp/applications/${a.applicationId}">開発者向け：申込確認（SC03 詳細）</a></p>
 <%@ include file="/WEB-INF/views/common/emp_bottom.jspf" %>

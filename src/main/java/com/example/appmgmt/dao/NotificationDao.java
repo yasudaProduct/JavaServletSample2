@@ -45,8 +45,14 @@ public class NotificationDao extends AbstractDao {
 
     /** 申込者宛の通知（申込者確認依頼、申込者アカウント通知）。申込者ポータルの「お知らせ」に使う。 */
     public List<Notification> findForApplicant(Connection conn, long applicantId, int limit) {
-        return query(conn, SELECT + " WHERE a.APPLICANT_ID = ? AND n.NOTIFICATION_TYPE IN (?, ?) ORDER BY n.NOTIFICATION_ID DESC OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY",
-                NotificationDao::map, applicantId, Codes.NOTIFY_CONSENT_REQUEST, Codes.NOTIFY_APPLICANT_ACCOUNT, limit);
+        return query(conn, SELECT + " WHERE a.APPLICANT_ID = ? AND n.NOTIFICATION_TYPE IN (?, ?, ?) ORDER BY n.NOTIFICATION_ID DESC OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY",
+                NotificationDao::map, applicantId, Codes.NOTIFY_CONSENT_REQUEST, Codes.NOTIFY_APPLICANT_ACCOUNT, Codes.NOTIFY_PASSWORD_RESET, limit);
+    }
+
+    /** この申込の申込者宛の通知（確認依頼、アカウント通知、パスワード初期化通知）。メンテナンス画面（SC15）の履歴に使う。 */
+    public List<Notification> findApplicantNoticesOfApplication(Connection conn, long applicationId) {
+        return query(conn, SELECT + " WHERE n.APPLICATION_ID = ? AND n.NOTIFICATION_TYPE IN (?, ?, ?) ORDER BY n.NOTIFICATION_ID DESC",
+                NotificationDao::map, applicationId, Codes.NOTIFY_CONSENT_REQUEST, Codes.NOTIFY_APPLICANT_ACCOUNT, Codes.NOTIFY_PASSWORD_RESET);
     }
 
     public List<Notification> findByApplication(Connection conn, long applicationId) {

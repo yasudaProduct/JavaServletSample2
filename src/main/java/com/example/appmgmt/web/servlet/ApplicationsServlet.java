@@ -16,11 +16,13 @@ import com.example.appmgmt.domain.LoginUser;
 import com.example.appmgmt.domain.StatusCd;
 import com.example.appmgmt.service.application.ApplicationDetail;
 import com.example.appmgmt.service.application.ApplicationQueryService;
+import com.example.appmgmt.service.application.PhaseGroup;
 import com.example.appmgmt.service.approval.ApprovalFlowView;
 import com.example.appmgmt.service.approval.ApprovalService;
 import com.example.appmgmt.service.transition.StatusTransitionService;
 import com.example.appmgmt.service.transition.TransitionResult;
 import com.example.appmgmt.web.form.ApplicationForm;
+import com.example.appmgmt.web.view.MenuSection;
 import com.example.appmgmt.web.view.MenuTile;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -72,6 +74,7 @@ public class ApplicationsServlet extends BaseServlet {
         switch (sub) {
             case "": detail(req, res, user, id); break;
             case "menu": menu(req, res, user, id); break;
+            case "maintenance": maintenance(req, res, user, id); break;
             case "additional": showAdditional(req, res, user, id); break;
             case "edit": showEdit(req, res, user, id); break;
             case "confirm": showConfirm(req, res, user, id); break;
@@ -109,6 +112,7 @@ public class ApplicationsServlet extends BaseServlet {
             case "confirm": postConfirm(req, res, user, id); break;
             case "approval": postApproval(req, res, user, id); break;
             case "revise": postRevise(req, res, user, id); break;
+            case "maintenance": postMaintenance(req, res, user, id, sub2); break;
             case "change":
                 if ("confirm".equals(sub2)) {
                     postChangeConfirm(req, res, user, id);
@@ -208,93 +212,159 @@ public class ApplicationsServlet extends BaseServlet {
 
     /**
      * SC14 申込メニュー：申込に関する操作の起点。
-     * タイルは常に同じ並びで表示し、ステータス×権限で活性・非活性だけを切り替える（表示・非表示や配置は変えない）。
+     * 「申込全体」の操作（契約変更・追加申込・メンテナンス）と、手続きの区切りごとの領域（新規申込、契約変更 1、契約変更 2 …）に分けて表示する。
+     * 領域は折りたたみを切り替えられ、各領域のタイルは常に同じ並びで、ステータス×権限で活性・非活性だけを切り替える。
      * 申込入力画面（SC04／SC08）へはメニューから直接進まず、申込内容確認（SC05／SC09）の「修正」から進む。
      */
     private void menu(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
         ApplicationDetail d = services().getApplicationQueryService().detail(id, user);
         String st = d.getApplication().getStatusCd();
-        boolean owner = user.isOwner() && d.getApplication().getOwnerEmployeeId() == user.getEmployeeId();
         boolean inChange = StatusCd.isContractChange(st) && !StatusCd.CHG_REVIEWED.equals(st);
         String base = "/emp/applications/" + id;
-        List<MenuTile> tiles = new ArrayList<>();
-        // 1. 申込内容確認（常に活性。入力中・申請待ちはここから「修正」で入力画面へ、「確定」で申請待ちへ）
-        tiles.add(new MenuTile("confirm", "申込内容確認", inChange
-                ? "契約変更の変更前後を確認します。入力中・申請待ちでは、ここから「修正」で契約変更入力へ進み、「確定」で申請待ちにします。"
-                : "申込内容を確認します。入力中・申請待ちでは、ここから「修正」で申込入力へ進み、「確定」で一次承認申請待ちにします。")
-                .link(inChange ? base + "/change/confirm" : base + "/confirm").style("primary"));
-        // 2. 申込修正（SC07：同意後の金額修正、事前確認指摘への修正対応）
-        if (d.has("revise")) {
-            tiles.add(new MenuTile("revise", "申込修正", "同意後の金額項目を修正します（一部修正）。基準版との倍率で遷移先が決まります。").link(base + "/revise").style("outline-primary"));
-        } else if (d.has("fix")) {
-            tiles.add(new MenuTile("revise", "申込修正", "審査担当部門の指摘に対して申込内容を修正し、事前確認を再依頼します（修正対応）。").link(base + "/revise").style("outline-primary"));
-        } else {
-            tiles.add(new MenuTile("revise", "申込修正", "同意後の金額修正（一部修正）と、事前確認の指摘への修正対応を行います。")
-                    .disabled(owner ? "最終承認申請待ち（金額の一部修正）と修正対応待ちの申込だけ行えます。" : "担当者だけが行えます。"));
-        }
-        // 3. 承認フロー（常に活性。申請待ちは担当者が申請、申請中は承認者が承認・差戻し、それ以外は参照）
-        if (d.has("request")) {
-            tiles.add(new MenuTile("approval", "承認フロー", "回付先を設定して承認を申請します。").link(base + "/approval").style("success"));
-        } else if (d.has("approvalFlow")) {
-            tiles.add(new MenuTile("approval", "承認フロー", "承認・差戻し・審査申請を行います。").link(base + "/approval").style("success"));
-        } else {
-            tiles.add(new MenuTile("approval", "承認フロー", StatusCd.APPROVAL_IN_PROGRESS.contains(st)
-                    ? "進行中の承認申請の状況（回付先・各ステップの結果）を確認します。申請中は申請できず、申請者は引戻しできません。"
-                    : "承認申請の状況と承認・申請履歴を確認します。").link(base + "/approval").style("outline-success"));
-        }
-        // 4. 契約変更
+        List<PhaseGroup> groups = PhaseGroup.build(d.getApplication(), d.getVersions());
+
+        // ---- 申込全体の操作 ----
+        List<MenuTile> general = new ArrayList<>();
         if (d.has("startChange")) {
-            tiles.add(new MenuTile("startChange", "契約変更", "審査完了版を複写した版を作り、契約変更の入力を始めます。").post(base + "/startChange").style("info")
+            general.add(new MenuTile("startChange", "契約変更", "審査完了版を複写した版を作り、契約変更の入力を始めます。新しい「契約変更 " + groups.size() + "」の領域が増えます。").post(base + "/startChange").style("info")
                     .confirm("契約変更手続きを開始します。審査完了版を複写した新しい版を作成します。よろしいですか？"));
         } else {
-            tiles.add(new MenuTile("startChange", "契約変更", "審査完了後に契約変更手続きを始めます。")
-                    .disabled(!user.isOwner() ? "担当者だけが行えます。" : inChange ? "契約変更の手続き中です。" : "審査完了（10701／20701）の申込だけ開始できます。"));
+            general.add(new MenuTile("startChange", "契約変更", "審査完了後に契約変更手続きを始めます。")
+                    .disabled(!user.isOwner() ? "担当者だけが行えます。" : inChange ? "契約変更の手続き中です。" : StatusCd.isCanceled(st) ? "取消済みの申込では行えません。" : "審査完了（10701／20701）の申込だけ開始できます。"));
         }
-        // 5. 引戻し
-        if (d.has("pullBack")) {
-            tiles.add(new MenuTile("pullBack", "引戻し", "申込者確認中の申込を一次承認申請待ちへ戻します。確認用 URL は無効になります。").post(base + "/pullBack").style("warning")
-                    .confirm("引戻しを行うと申込者の確認用 URL は無効になります。よろしいですか？"));
-        } else {
-            tiles.add(new MenuTile("pullBack", "引戻し", "申込者確認中の申込を一次承認申請待ちへ戻します。")
-                    .disabled(!user.isOwner() ? "担当者だけが行えます。" : StatusCd.APPROVAL_IN_PROGRESS.contains(st)
-                            ? "承認申請中は引戻しできません。承認者の処理をお待ちください。" : "申込者確認中（内容確認待ち・同意確認待ち）の申込だけ行えます。"));
-        }
-        // 6. 申込取消（契約変更中は契約変更の取消として、契約変更前の審査完了状態へ戻す）
-        if (d.has("cancel")) {
-            tiles.add(new MenuTile("cancel", "申込取消", "申込を取り消します。取り消した申込は以降操作できません。").post(base + "/cancel").style("danger")
-                    .confirm("この申込を取り消します。取り消した申込は元に戻せません。よろしいですか？").withReasonInput());
-        } else if (d.has("cancelChange")) {
-            tiles.add(new MenuTile("cancel", "申込取消", "契約変更中のため、契約変更を取り消して契約変更前の審査完了の状態へ戻します（申込自体は残ります）。").post(base + "/cancel").style("danger")
-                    .confirm("契約変更を取り消し、契約変更前の状態へ戻します。よろしいですか？").withReasonInput().buttonLabel("契約変更の取消"));
-        } else {
-            tiles.add(new MenuTile("cancel", "申込取消", "申込を取り消します。契約変更中は契約変更だけを取り消します。")
-                    .disabled(!user.isOwner() ? "担当者だけが行えます。" : StatusCd.isCanceled(st) ? "取消済みです。" : "現在のステータスでは取り消せません（承認申請中・事前確認待ち・審査中・審査完了は不可）。"));
-        }
-        // 7. 追加申込
         if (d.has("additional")) {
-            tiles.add(new MenuTile("additional", "追加申込", "この申込の申込者と申込内容を複写して、新しい申込を作ります。").link(base + "/additional").style("outline-primary"));
+            general.add(new MenuTile("additional", "追加申込", "この申込の申込者と申込内容を複写して、新しい申込を作ります。").link(base + "/additional").style("outline-primary"));
         } else {
-            tiles.add(new MenuTile("additional", "追加申込", "この申込を元に新しい申込を作ります。").disabled(user.isOwner() ? "取消済みの申込からは作れません。" : "担当者だけが行えます。"));
+            general.add(new MenuTile("additional", "追加申込", "この申込を元に新しい申込を作ります。").disabled(user.isOwner() ? "取消済みの申込からは作れません。" : "担当者だけが行えます。"));
         }
-        // 8. 確認依頼メール再送
-        if (d.has("resendConsent")) {
-            tiles.add(new MenuTile("resendConsent", "確認依頼メール再送", "新しい確認用 URL を発行して申込者へ再送します。旧 URL は無効になります。").post(base + "/resendConsent").style("outline-secondary")
-                    .confirm("確認依頼メールを再送します。旧 URL は使えなくなります。よろしいですか？"));
+        boolean maintainer = user.isAdmin() || (user.isOwner() && d.getApplication().getOwnerEmployeeId() == user.getEmployeeId());
+        if (maintainer) {
+            general.add(new MenuTile("maintenance", "メンテナンス", "申込者への通知の履歴を確認し、申込者ページのパスワードを初期化します。").link(base + "/maintenance").style("outline-secondary"));
         } else {
-            tiles.add(new MenuTile("resendConsent", "確認依頼メール再送", "申込者への確認依頼メールを再送します。")
-                    .disabled(!user.isOwner() ? "担当者だけが行えます。" : "申込者確認中（内容確認待ち・同意確認待ち）の申込だけ再送できます。"));
+            general.add(new MenuTile("maintenance", "メンテナンス", "申込者への通知の履歴の確認とパスワードの初期化を行います。").disabled("担当者または管理者だけが行えます。"));
         }
-        // 9. 外部連携再送
-        if (d.has("resendExternal")) {
-            tiles.add(new MenuTile("resendExternal", "外部連携再送", "送信エラーになった審査担当部門への依頼を再送します。").post(base + "/resendExternal").style("outline-danger")
-                    .confirm("送信エラーの外部連携を再送します。よろしいですか？"));
-        } else {
-            tiles.add(new MenuTile("resendExternal", "外部連携再送", "送信エラーになった審査担当部門への依頼を再送します。").disabled("送信エラーになった外部連携はありません。"));
+
+        // ---- 手続きごとの領域 ----
+        List<MenuSection> sections = new ArrayList<>();
+        for (PhaseGroup g : groups) {
+            boolean live = g.isCurrent();
+            boolean change = g.isContractChange();
+            String gsuf = "-g" + g.getIndex();
+            String why;
+            if (live) {
+                why = null;
+            } else if (g.getState() == PhaseGroup.State.CANCELED) {
+                why = change ? "この契約変更は取り消されています（審査差戻しまたは取消）。" : "申込は取り消されています。";
+            } else {
+                why = change ? "この契約変更は審査完了しています。操作は進行中の領域で行います。" : "新規申込の手続きは完了しています。操作は進行中の領域で行います。";
+            }
+            String badge = g.getState() == PhaseGroup.State.ACTIVE ? "primary" : g.getState() == PhaseGroup.State.COMPLETED ? "success" : "dark";
+            String desc = "第 " + g.getFirstVersionNo() + " 版" + (g.getLastVersionNo() != g.getFirstVersionNo() ? "〜第 " + g.getLastVersionNo() + " 版" : "")
+                    + (change && g.getBaseline() != null ? "　変更前：第 " + g.getBaseline().getVersionNo() + " 版" : "");
+            MenuSection sec = new MenuSection(String.valueOf(g.getIndex()), g.getTitle(), g.getStateName(), badge, desc, live || groups.size() == 1);
+            // 1. 内容確認（常に活性）
+            sec.add(new MenuTile("confirm" + gsuf, change ? "契約変更内容確認" : "申込内容確認", change
+                    ? (live ? "契約変更の変更前後を確認します。入力中・申請待ちでは、ここから「修正」で契約変更入力へ進み、「確定」で申請待ちにします。" : "この契約変更の変更前後の内容を参照します。")
+                    : (live ? "申込内容を確認します。入力中・申請待ちでは、ここから「修正」で申込入力へ進み、「確定」で一次承認申請待ちにします。" : "新規申込の内容を参照します。"))
+                    .link((change ? base + "/change/confirm" : base + "/confirm") + "?group=" + g.getIndex()).style(live ? "primary" : "outline-primary"));
+            // 2. 申込修正（SC07）
+            if (live && d.has("revise")) {
+                sec.add(new MenuTile("revise" + gsuf, "申込修正", "同意後の金額項目を修正します（一部修正）。基準版との倍率で遷移先が決まります。").link(base + "/revise").style("outline-primary"));
+            } else if (live && d.has("fix")) {
+                sec.add(new MenuTile("revise" + gsuf, "申込修正", "審査担当部門の指摘に対して申込内容を修正し、事前確認を再依頼します（修正対応）。").link(base + "/revise").style("outline-primary"));
+            } else {
+                sec.add(new MenuTile("revise" + gsuf, "申込修正", "同意後の金額修正（一部修正）と、事前確認の指摘への修正対応を行います。")
+                        .disabled(why != null ? why : user.isOwner() ? "最終承認申請待ち（金額の一部修正）と修正対応待ちの申込だけ行えます。" : "担当者だけが行えます。"));
+            }
+            // 3. 承認フロー（常に活性。過去の領域は履歴の参照）
+            if (live && d.has("request")) {
+                sec.add(new MenuTile("approval" + gsuf, "承認フロー", "回付先を設定して承認を申請します。").link(base + "/approval?group=" + g.getIndex()).style("success"));
+            } else if (live && d.has("approvalFlow")) {
+                sec.add(new MenuTile("approval" + gsuf, "承認フロー", "承認・差戻し・審査申請を行います。").link(base + "/approval?group=" + g.getIndex()).style("success"));
+            } else {
+                sec.add(new MenuTile("approval" + gsuf, "承認フロー", live && StatusCd.APPROVAL_IN_PROGRESS.contains(st)
+                        ? "進行中の承認申請の状況（回付先・各ステップの結果）を確認します。申請中は申請できず、申請者は引戻しできません。"
+                        : (change ? "この契約変更の" : "新規申込の") + "承認・申請履歴を確認します。").link(base + "/approval?group=" + g.getIndex()).style("outline-success"));
+            }
+            // 4. 引戻し
+            if (live && d.has("pullBack")) {
+                sec.add(new MenuTile("pullBack" + gsuf, "引戻し", "申込者確認中の申込を一次承認申請待ちへ戻します。確認用 URL は無効になります。").post(base + "/pullBack").style("warning")
+                        .confirm("引戻しを行うと申込者の確認用 URL は無効になります。よろしいですか？"));
+            } else {
+                sec.add(new MenuTile("pullBack" + gsuf, "引戻し", "申込者確認中の申込を一次承認申請待ちへ戻します。")
+                        .disabled(why != null ? why : !user.isOwner() ? "担当者だけが行えます。" : StatusCd.APPROVAL_IN_PROGRESS.contains(st)
+                                ? "承認申請中は引戻しできません。承認者の処理をお待ちください。" : "申込者確認中（内容確認待ち・同意確認待ち）の申込だけ行えます。"));
+            }
+            // 5. 取消（新規申込：申込取消、契約変更：契約変更の取消）
+            if (live && !change && d.has("cancel")) {
+                sec.add(new MenuTile("cancel" + gsuf, "申込取消", "申込を取り消します。取り消した申込は以降操作できません。").post(base + "/cancel").style("danger")
+                        .confirm("この申込を取り消します。取り消した申込は元に戻せません。よろしいですか？").withReasonInput());
+            } else if (live && change && d.has("cancelChange")) {
+                sec.add(new MenuTile("cancel" + gsuf, "契約変更の取消", "この契約変更を取り消して、契約変更前の審査完了の状態へ戻します（申込自体は残ります）。").post(base + "/cancel").style("danger")
+                        .confirm("契約変更を取り消し、契約変更前の状態へ戻します。よろしいですか？").withReasonInput());
+            } else {
+                sec.add(new MenuTile("cancel" + gsuf, change ? "契約変更の取消" : "申込取消", change ? "この契約変更を取り消します。" : "申込を取り消します。")
+                        .disabled(why != null ? why : !user.isOwner() ? "担当者だけが行えます。" : StatusCd.isCanceled(st) ? "取消済みです。" : "現在のステータスでは取り消せません（承認申請中・事前確認待ち・審査中・審査完了は不可）。"));
+            }
+            // 6. 確認依頼メール再送
+            if (live && d.has("resendConsent")) {
+                sec.add(new MenuTile("resendConsent" + gsuf, "確認依頼メール再送", "新しい確認用 URL を発行して申込者へ再送します。旧 URL は無効になります。").post(base + "/resendConsent").style("outline-secondary")
+                        .confirm("確認依頼メールを再送します。旧 URL は使えなくなります。よろしいですか？"));
+            } else {
+                sec.add(new MenuTile("resendConsent" + gsuf, "確認依頼メール再送", "申込者への確認依頼メールを再送します。")
+                        .disabled(why != null ? why : !user.isOwner() ? "担当者だけが行えます。" : "申込者確認中（内容確認待ち・同意確認待ち）の申込だけ再送できます。"));
+            }
+            // 7. 外部連携再送
+            if (live && d.has("resendExternal")) {
+                sec.add(new MenuTile("resendExternal" + gsuf, "外部連携再送", "送信エラーになった審査担当部門への依頼を再送します。").post(base + "/resendExternal").style("outline-danger")
+                        .confirm("送信エラーの外部連携を再送します。よろしいですか？"));
+            } else {
+                sec.add(new MenuTile("resendExternal" + gsuf, "外部連携再送", "送信エラーになった審査担当部門への依頼を再送します。").disabled(why != null ? why : "送信エラーになった外部連携はありません。"));
+            }
+            sections.add(sec);
         }
         req.setAttribute("d", d);
-        req.setAttribute("tiles", tiles);
+        req.setAttribute("generalTiles", general);
+        req.setAttribute("sections", sections);
         req.setAttribute("rowVersion", d.getApplication().getRowVersion());
         render(req, res, "emp/applications/menu.jsp");
+    }
+
+    // ------------------------------------------------------------------ SC15 メンテナンス
+
+    private boolean canMaintain(LoginUser user, ApplicationDetail d) {
+        return user.isAdmin() || (user.isOwner() && d.getApplication().getOwnerEmployeeId() == user.getEmployeeId());
+    }
+
+    /** SC15 メンテナンス：申込者への通知の履歴と、申込者ページのパスワード初期化。担当者と管理者が使う。 */
+    private void maintenance(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
+        ApplicationDetail d = services().getApplicationQueryService().detail(id, user);
+        if (!canMaintain(user, d)) {
+            throw new ForbiddenException();
+        }
+        List<com.example.appmgmt.domain.Notification> notices = Tx.execute(conn -> services().getNotificationDao().findApplicantNoticesOfApplication(conn, id));
+        req.setAttribute("d", d);
+        req.setAttribute("notices", notices);
+        req.setAttribute("canReset", d.getApplicant() != null && d.getApplicant().isAccountIssued());
+        render(req, res, "emp/applications/maintenance.jsp");
+    }
+
+    private void postMaintenance(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id, String action) throws ServletException, IOException {
+        ApplicationDetail d = services().getApplicationQueryService().detail(id, user);
+        if (!canMaintain(user, d)) {
+            throw new ForbiddenException();
+        }
+        if (!"resetPassword".equals(action)) {
+            res.sendError(404);
+            return;
+        }
+        services().getApplicantAuthService().resetPassword(id, services().getApplicationDao());
+        flashMessage(req, "success", "I018");
+        redirect(req, res, "/emp/applications/" + id + "/maintenance");
+    }
+
+    private static Integer groupParam(HttpServletRequest req) {
+        return parseId(param(req, "group")) == null ? null : parseId(param(req, "group")).intValue();
     }
 
     /** SC14 の操作ボタン（POST /emp/applications/{id}/{action}）。 */
@@ -436,22 +506,46 @@ public class ApplicationsServlet extends BaseServlet {
      */
     private void showConfirm(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
         ApplicationDetail d = services().getApplicationQueryService().detail(id, user);
+        List<PhaseGroup> groups = PhaseGroup.build(d.getApplication(), d.getVersions());
+        PhaseGroup g = PhaseGroup.find(groups, groupParam(req));
+        if (g.isContractChange()) {
+            redirect(req, res, "/emp/applications/" + id + "/change/confirm?group=" + g.getIndex());
+            return;
+        }
         String st = d.getApplication().getStatusCd();
+        boolean live = g.isCurrent();
+        ApplicationVersion view = live ? d.getCurrentVersion() : g.getDisplayVersion();
         boolean owner = user.isOwner() && d.getApplication().getOwnerEmployeeId() == user.getEmployeeId();
-        ApplicationForm form = ApplicationForm.from(d.getCurrentVersion());
+        ApplicationForm form = ApplicationForm.from(view);
         Validation v = form.validate(true, false, false);
-        boolean editable = Set.of(StatusCd.IMPORTED, StatusCd.INPUT).contains(st);
-        boolean canModify = owner && (d.has("input") || d.has("modify"));
-        boolean fullRevise = owner && d.has("fullRevise");
+        boolean editable = live && Set.of(StatusCd.IMPORTED, StatusCd.INPUT).contains(st);
+        boolean canModify = live && owner && (d.has("input") || d.has("modify"));
+        boolean fullRevise = live && owner && d.has("fullRevise");
         req.setAttribute("d", d);
+        req.setAttribute("group", g);
+        req.setAttribute("viewVersion", view);
+        req.setAttribute("diffBase", copiedFrom(d, view));
         req.setAttribute("errors", editable ? v.getErrors() : java.util.Map.of());
         req.setAttribute("canModify", canModify);
         req.setAttribute("fullRevise", fullRevise);
         req.setAttribute("modifyNote", canModify ? (fullRevise ? "「修正」を押すと申込内容全体を修正し直すため入力中へ戻り、申込者の同意を取り直します（全体修正）。" : StatusCd.INPUT.equals(st) ? "" : "「修正」を押すと入力中（10101）に戻って申込入力画面を開きます。")
-                : !owner ? "修正・確定は担当者だけが行えます。" : StatusCd.isCanceled(st) ? "取消済みの申込は修正できません。" : StatusCd.REVIEWED.equals(st) ? "審査完了後の変更は「契約変更」から行います。" : "現在のステータスでは修正できません（承認申請中・申込者確認中・事前確認待ち・審査中）。");
+                : !live ? "完了した手続きの内容です（参照のみ）。" : !owner ? "修正・確定は担当者だけが行えます。" : StatusCd.isCanceled(st) ? "取消済みの申込は修正できません。" : StatusCd.REVIEWED.equals(st) ? "審査完了後の変更は「契約変更」から行います。" : "現在のステータスでは修正できません（承認申請中・申込者確認中・事前確認待ち・審査中）。");
         req.setAttribute("canConfirm", owner && editable && !v.hasErrors());
-        req.setAttribute("confirmNote", owner && editable ? (v.hasErrors() ? "入力内容に誤りがあるため確定できません。「修正」で入力し直してください。" : "") : !owner ? "" : editable ? "" : "確定済みです。");
+        req.setAttribute("confirmNote", owner && editable ? (v.hasErrors() ? "入力内容に誤りがあるため確定できません。「修正」で入力し直してください。" : "") : !owner || !live ? "" : "確定済みです。");
         render(req, res, "emp/applications/confirm.jsp");
+    }
+
+    /** 全体修正で作った版（版種別 2）の複写元。差分を赤字で示すために使う。該当しなければ null。 */
+    private static ApplicationVersion copiedFrom(ApplicationDetail d, ApplicationVersion view) {
+        if (view == null || !Codes.VERSION_NEW_REVISED.equals(view.getVersionType()) || view.getCopiedFromVersionNo() == null) {
+            return null;
+        }
+        for (ApplicationVersion v : d.getVersions()) {
+            if (v.getVersionNo() == view.getCopiedFromVersionNo()) {
+                return v;
+            }
+        }
+        return null;
     }
 
     private void postConfirm(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
@@ -487,6 +581,14 @@ public class ApplicationsServlet extends BaseServlet {
 
     private void showApproval(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
         ApprovalFlowView v = services().getApprovalService().load(id, user);
+        ApplicationDetail full = services().getApplicationQueryService().detail(id, user);
+        List<PhaseGroup> groups = PhaseGroup.build(full.getApplication(), full.getVersions());
+        PhaseGroup g = PhaseGroup.find(groups, groupParam(req));
+        // 領域ごとの承認・申請履歴に絞る。過去の領域は参照のみ
+        v.restrictToVersions(g.versionNos(), g.isCurrent() ? null : "完了・取消した手続きの承認・申請履歴です（参照のみ）。");
+        req.setAttribute("group", g);
+        req.setAttribute("viewVersion", g.isCurrent() ? full.getCurrentVersion() : g.getDisplayVersion());
+        req.setAttribute("diffBase", copiedFrom(full, g.isCurrent() ? full.getCurrentVersion() : g.getDisplayVersion()));
         req.setAttribute("v", v);
         req.setAttribute("d", v.getDetail());
         req.setAttribute("initialApproverIds", v.getInitialApproverIds());
@@ -643,28 +745,36 @@ public class ApplicationsServlet extends BaseServlet {
     private void showChangeConfirm(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id) throws ServletException, IOException {
         ApplicationDetail d = services().getApplicationQueryService().detail(id, user);
         String st = d.getApplication().getStatusCd();
-        if (!StatusCd.isContractChange(st) || StatusCd.CHG_REVIEWED.equals(st)) {
-            redirect(req, res, "/emp/applications/" + id + "/confirm");
+        List<PhaseGroup> groups = PhaseGroup.build(d.getApplication(), d.getVersions());
+        PhaseGroup g = PhaseGroup.find(groups, groupParam(req));
+        if (!g.isContractChange()) {
+            redirect(req, res, "/emp/applications/" + id + "/confirm?group=0");
             return;
         }
+        boolean live = g.isCurrent();
         boolean owner = user.isOwner() && d.getApplication().getOwnerEmployeeId() == user.getEmployeeId();
-        boolean canModify = owner && (d.has("inputChange") || d.has("modifyChange"));
+        boolean canModify = live && owner && (d.has("inputChange") || d.has("modifyChange"));
         req.setAttribute("canModify", canModify);
         req.setAttribute("modifyNote", canModify ? (StatusCd.CHG_INPUT.equals(st) ? "" : "「修正」を押すと【契約変更】入力中（20101）に戻って契約変更入力画面を開きます。")
-                : !owner ? "修正・確定は担当者だけが行えます。" : StatusCd.CHG_FIX_WAIT.equals(st) ? "修正対応は申込メニューの「申込修正」から行います。" : "現在のステータスでは修正できません（承認申請中・申込者確認中・事前確認待ち・審査中）。");
-        ApplicationVersion cur = d.getCurrentVersion();
-        ApplicationVersion reviewed = d.getReviewedVersion();
-        java.math.BigDecimal ratio = reviewed == null ? null : Formats.amountRatio(cur.getTotalAmount(), d.getBaseVersion() == null ? reviewed.getTotalAmount() : d.getBaseVersion().getTotalAmount());
+                : !live ? "完了・取消した契約変更の内容です（参照のみ）。" : !owner ? "修正・確定は担当者だけが行えます。" : StatusCd.CHG_FIX_WAIT.equals(st) ? "修正対応は申込メニューの「申込修正」から行います。"
+                : StatusCd.CHG_REVIEWED.equals(st) ? "審査完了した契約変更です。次の変更は「契約変更」から始めます。" : "現在のステータスでは修正できません（承認申請中・申込者確認中・事前確認待ち・審査中）。");
+        ApplicationVersion cur = live ? d.getCurrentVersion() : g.getDisplayVersion();
+        ApplicationVersion reviewed = live && !StatusCd.CHG_REVIEWED.equals(st) ? d.getReviewedVersion() : g.getBaseline();
+        java.math.BigDecimal ratioBase = reviewed == null ? null : (live && !StatusCd.CHG_REVIEWED.equals(st) && d.getBaseVersion() != null ? d.getBaseVersion().getTotalAmount() : reviewed.getTotalAmount());
+        java.math.BigDecimal ratio = ratioBase == null ? null : Formats.amountRatio(cur.getTotalAmount(), ratioBase);
         boolean over = StatusTransitionService.isOverLimit(ratio, d.getCompanyDiv().getAmountRatioLimit());
         Validation v = ApplicationForm.from(cur).validate(true, false, false);
         req.setAttribute("d", d);
+        req.setAttribute("group", g);
+        req.setAttribute("viewVersion", cur);
+        req.setAttribute("baselineVersion", reviewed);
         req.setAttribute("ratio", ratio);
         req.setAttribute("overLimit", over);
         req.setAttribute("noChange", reviewed != null && cur.sameContentAs(reviewed));
-        req.setAttribute("errors", v.getErrors());
-        boolean canConfirm = owner && StatusCd.CHG_INPUT.equals(st) && !v.hasErrors();
+        req.setAttribute("errors", live ? v.getErrors() : java.util.Map.of());
+        boolean canConfirm = live && owner && StatusCd.CHG_INPUT.equals(st) && !v.hasErrors();
         req.setAttribute("canConfirm", canConfirm);
-        req.setAttribute("confirmNote", !owner ? "" : StatusCd.CHG_INPUT.equals(st) ? (v.hasErrors() ? "入力内容に誤りがあるため確定できません。「修正」で入力し直してください。" : "") : "確定済みです。");
+        req.setAttribute("confirmNote", !owner || !live ? "" : StatusCd.CHG_INPUT.equals(st) ? (v.hasErrors() ? "入力内容に誤りがあるため確定できません。「修正」で入力し直してください。" : "") : "確定済みです。");
         String next;
         if (over) {
             next = "20201 【契約変更】一次承認申請待ち（一次承認・申込者確認を経る）";

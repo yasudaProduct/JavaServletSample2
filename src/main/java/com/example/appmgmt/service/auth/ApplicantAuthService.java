@@ -50,6 +50,24 @@ public class ApplicantAuthService {
         }
     }
 
+    /**
+     * パスワードの初期化（SC15 メンテナンス）：新しい初期パスワードを発行して保存し、通知 09 を登録する。
+     * パスワード変更日時は空に戻す（初期パスワードのままの状態）。アカウント未発行は E117。
+     */
+    public void resetPassword(long applicationId, com.example.appmgmt.dao.ApplicationDao applicationDao) {
+        Tx.executeVoid(conn -> {
+            Application app = applicationDao.findById(conn, applicationId).orElseThrow(() -> new BusinessException("E103"));
+            Applicant applicant = applicantDao.findById(conn, app.getApplicantId()).orElseThrow(() -> new BusinessException("E103"));
+            if (!applicant.isAccountIssued()) {
+                throw new BusinessException("E117");
+            }
+            String initialPassword = generatePassword();
+            applicantDao.updatePassword(conn, applicant.getApplicantId(), PasswordHasher.hash(initialPassword), null);
+            notificationService.registerPasswordReset(conn, app, applicant.getApplicantNo(), initialPassword);
+            log.info("申込者のパスワードを初期化しました applicantId={} loginId={}", applicant.getApplicantId(), applicant.getApplicantNo());
+        });
+    }
+
     static String generatePassword() {
         StringBuilder sb = new StringBuilder(INITIAL_PASSWORD_LENGTH);
         for (int i = 0; i < INITIAL_PASSWORD_LENGTH; i++) {

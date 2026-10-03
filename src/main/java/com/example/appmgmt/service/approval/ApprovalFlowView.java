@@ -35,6 +35,26 @@ public class ApprovalFlowView {
     public String getApprovalType() { return approvalType; }
     public void setApprovalType(String approvalType) { this.approvalType = approvalType; }
     public String getApprovalTypeName() { return approvalType == null ? "－" : com.example.appmgmt.domain.Codes.label("APPROVAL_TYPE", approvalType); }
+    /** 過去の手続き（完了・取消した領域）の参照：履歴を対象版に絞り、操作をすべて非活性にする。 */
+    public void restrictToVersions(java.util.Set<Integer> versionNos, String note) {
+        List<ApprovalRequest> filtered = new ArrayList<>();
+        for (ApprovalRequest r : history) {
+            if (versionNos.contains(r.getVersionNo())) {
+                filtered.add(r);
+            }
+        }
+        history = filtered;
+        if (note == null) {
+            return;
+        }
+        if (activeRequest != null && !versionNos.contains(activeRequest.getVersionNo())) {
+            activeRequest = null;
+        }
+        mode = Mode.VIEW;
+        canOperate = false;
+        viewNote = note;
+    }
+
     /** 参照モードのときに表示する説明（操作できない理由）。 */
     public String getViewNote() { return viewNote; }
     public void setViewNote(String viewNote) { this.viewNote = viewNote; }
