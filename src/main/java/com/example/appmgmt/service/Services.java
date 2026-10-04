@@ -79,8 +79,8 @@ public final class Services {
                 approvalRequestDao, applicantConsentDao, externalLinkDao, notificationService, consentIssuer, applicantAuthService);
         applicationQueryService = new ApplicationQueryService(applicationDao, applicationVersionDao, applicantAccountDao, employeeDao, statusDao, companyDivDao,
                 approvalRequestDao, applicantConsentDao, externalLinkDao, statusHistoryDao, statusTransitionDao);
-        applicationService = new ApplicationService(applicationDao, applicationVersionDao, applicantAccountDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer);
-        importService = new ImportService(applicationDao, applicationVersionDao, applicantAccountDao, importBatchDao, statusHistoryDao);
+        applicationService = new ApplicationService(applicationDao, applicationVersionDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer);
+        importService = new ImportService(applicationDao, applicationVersionDao, importBatchDao, statusHistoryDao);
         approvalService = new ApprovalService(applicationDao, approvalRequestDao, approvalRouteDao, employeeDao, applicationQueryService, statusTransitionService, notificationService);
         consentService = new ConsentService(applicantConsentDao, applicationDao, applicationVersionDao, applicantAccountDao, statusDao, statusTransitionService);
         externalRequestBuilder = new ExternalRequestBuilder(applicationDao, applicationVersionDao, applicantAccountDao);

@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.3（申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウントに変更） |
+| 版 | 0.4（申込者アカウントを複数の申込で共有するのは追加申込だけ。版 0.3：申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウントに変更） |
 | 図の原本 | [er-diagram.drawio](../diagrams/er-diagram.drawio)（draw.io 形式。PNG は [diagrams/png/er-diagram.png](../diagrams/png/er-diagram.png)） |
 | 関連 | [07. テーブル定義](07-table-definition.md)、[08. コード定義](08-code-definition.md) |
 
@@ -48,7 +48,7 @@ erDiagram
 | 2 | M_COMPANY_DIV | M_APPROVAL_ROUTE | COMPANY_DIV | 1 : 0..n | |
 | 3 | M_COMPANY_DIV | T_APPLICATION | COMPANY_DIV | 1 : 0..n | 起票時点の担当社員の会社区分 |
 | 4 | M_EMPLOYEE | T_APPLICATION | OWNER_EMPLOYEE_ID | 1 : 0..n | 担当社員 |
-| 5 | M_APPLICANT_ACCOUNT | T_APPLICATION | APPLICANT_ID | 0..1 : 0..n | 一次承認が通ったときにアカウントを発行して紐づける。同じ申込者の 2 件目以降は申込者番号の指定で既存のアカウントに紐づける。未発行の申込は空 |
+| 5 | M_APPLICANT_ACCOUNT | T_APPLICATION | APPLICANT_ID | 0..1 : 0..n | 新規申込は一次承認が通ったときにアカウントを発行して紐づける。追加申込は元の申込のアカウントを引き継ぐ。未発行の申込は空 |
 | 6 | M_STATUS | T_APPLICATION | STATUS_CD | 1 : 0..n | 現在ステータス |
 | 7 | M_STATUS | M_STATUS_TRANSITION | FROM_STATUS_CD、TO_STATUS_CD | 1 : 0..n（2 本） | |
 | 8 | M_APPROVAL_ROUTE | M_APPROVAL_ROUTE_STEP | ROUTE_ID | 1 : 1..n | 識別関係（複合主キー） |
@@ -88,7 +88,7 @@ erDiagram
 ### 4.4 申込者
 
 - 申込者名・申込者名カナ・メールアドレス・電話番号・住所は申込データとして申込内容（T_APPLICATION_VERSION）の各版に持つ。全体修正・契約変更・申込者の修正の対象になり、版ごとの差分を表示できる。
-- 申込者アカウント（M_APPLICANT_ACCOUNT）はログインに必要なデータ（申込者番号 = ユーザー ID、パスワードのハッシュ、発行日時、パスワード変更日時）だけを持つ。1 つのアカウントに複数の申込を紐づけられる。
+- 申込者アカウント（M_APPLICANT_ACCOUNT）はログインに必要なデータ（申込者番号 = ユーザー ID、パスワードのハッシュ、発行日時、パスワード変更日時）だけを持つ。1 つのアカウントに複数の申込を紐づけるのは追加申込（同じ申込者）だけで、新規申込は同じ氏名・メールアドレスでも別のアカウントになる。
 
 ### 4.5 外部連携
 

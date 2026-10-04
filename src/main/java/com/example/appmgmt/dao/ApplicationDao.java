@@ -46,32 +46,9 @@ public class ApplicationDao extends AbstractDao {
         return query(conn, SELECT + " WHERE APPLICANT_ID = ? ORDER BY UPDATED_AT DESC, APPLICATION_ID DESC", ApplicationDao::map, applicantId);
     }
 
-    /** 申込に申込者アカウントを紐づける（F14 後続処理・申込入力の同一トランザクション内の付随更新。行バージョンは進めない）。 */
+    /** 申込に申込者アカウントを紐づける（F14 後続処理のアカウント発行と同一トランザクション内の付随更新。行バージョンは進めない）。 */
     public void linkAccount(Connection conn, long applicationId, long applicantId) {
         update(conn, "UPDATE T_APPLICATION SET APPLICANT_ID = ?, UPDATED_AT = ?, UPDATED_BY = ? WHERE APPLICATION_ID = ?", applicantId, now(), actor(), applicationId);
-    }
-
-    /**
-     * 同じメールアドレス（現行版の申込者情報。大文字・小文字を区別しない）で申込者アカウントが発行済みの申込者。
-     * 重複の確認（W003）に使う。申込者番号ごとに 1 件（申込者名は最新の申込のもの）。
-     */
-    public List<com.example.appmgmt.domain.Applicant> findAccountHoldersByMail(Connection conn, String mailAddress, Long excludeApplicationId) {
-        List<com.example.appmgmt.domain.Applicant> rows = query(conn,
-                "SELECT p.APPLICANT_NO, v.APPLICANT_NAME, v.MAIL_ADDRESS FROM T_APPLICATION a JOIN M_APPLICANT_ACCOUNT p ON p.APPLICANT_ID = a.APPLICANT_ID "
-                        + "JOIN T_APPLICATION_VERSION v ON v.APPLICATION_ID = a.APPLICATION_ID AND v.VERSION_NO = a.CURRENT_VERSION_NO "
-                        + "WHERE LOWER(v.MAIL_ADDRESS) = LOWER(?) AND a.APPLICATION_ID <> ? ORDER BY p.APPLICANT_NO, a.UPDATED_AT DESC",
-                rs -> {
-                    com.example.appmgmt.domain.Applicant x = new com.example.appmgmt.domain.Applicant();
-                    x.setApplicantNo(rs.getString("APPLICANT_NO"));
-                    x.setApplicantName(rs.getString("APPLICANT_NAME"));
-                    x.setMailAddress(rs.getString("MAIL_ADDRESS"));
-                    return x;
-                }, mailAddress, excludeApplicationId == null ? -1L : excludeApplicationId);
-        java.util.Map<String, com.example.appmgmt.domain.Applicant> distinct = new java.util.LinkedHashMap<>();
-        for (com.example.appmgmt.domain.Applicant x : rows) {
-            distinct.putIfAbsent(x.getApplicantNo(), x);
-        }
-        return new ArrayList<>(distinct.values());
     }
 
     /** 申込者アカウントの最新の申込の申込者名（申込者ポータルの表示名）。 */

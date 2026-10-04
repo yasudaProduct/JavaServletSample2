@@ -76,11 +76,10 @@ async function mockResult(page, appNo, result, reason = '') {
   await page.waitForLoadState('networkidle');
   console.log('    mock:', (await alerts(page)).slice(0, 100));
 }
-// 申込者情報（申込データ）の入力。no を渡すと発行済みの申込者アカウントに紐づける（同じ申込者の 2 件目以降）
+// 申込者情報（申込データ）の入力。新規申込は同じ氏名・メールアドレスでも別の申込者になる
 async function fillApplicant(page, applicant) {
   await page.fill('#applicantName', applicant.name); await page.fill('#applicantKana', applicant.kana || '');
   await page.fill('#mailAddress', applicant.mail); await page.fill('#telNo', applicant.tel || ''); await page.fill('#address', applicant.address || '');
-  if (applicant.no) { await page.fill('#applicantNo', applicant.no); }
 }
 async function applicantNoOnMenu(page) { const m = (await page.locator('.menu-head').textContent()).match(/C\d{10}/); return m ? m[0] : null; }
 async function createApplication(page, applicant, basic, option) {
@@ -174,6 +173,10 @@ async function portalLogin(apPage, id, pw) {
     await expectStatus(page, '10201', '確定後（メニュー）');
     await shot(page, 'SC14-10201');
     await checkTiles(page, a.appId, '10201');
+    if (await page.locator('#tile-additional.tile-disabled').count() !== 1) throw new Error('10201: 追加申込 should be disabled until 審査完了');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/additional');
+    if (page.url().endsWith('/additional') || !(await alerts(page)).includes('現在のステータスではこの操作はできません')) throw new Error('10201: direct access to 追加申込 should be rejected (E101)');
+    console.log('OK  追加申込は審査完了まで不可（タイル非活性、URL 直接指定は E101）');
     // 10201 → SC05「修正」→ 10101（申込入力）→ 確認へ → 確定 → 10201（メニューに入力画面へのタイルはない）
     await page.goto(BASE + '/emp/applications/' + a.appId + '/confirm'); await shot(page, 'SC05-10201');
     await page.click('#modifyBtn'); await page.waitForURL('**/edit');
@@ -340,31 +343,35 @@ async function portalLogin(apPage, id, pw) {
     console.log('OK  過去の領域の参照（SC05／SC09／SC06）: 契約変更3 の履歴行 =', histRows);
     await logout(page);
 
-    // ---------- 申込取消 ----------
+    // ---------- 追加申込（同じ申込者）：元の申込が審査完了のときだけ。アカウントを引き継ぎ、申込者情報は複写した別データ ----------
     await login(page, 'A001');
-    // 同じ申込者の 2 件目：申込者番号なしで同じメールアドレスを入れると W003（アカウント発行済み）→ 申込者番号を入れて既存のアカウントに紐づける
-    await page.goto(BASE + '/emp/applications/new');
-    await fillApplicant(page, { name: '山田 太郎', mail: 'TARO.YAMADA@example.com' }); await page.fill('#productCd', 'PRD001'); await page.fill('#basicFee', '800000');
-    await page.click('button[value=save]'); await page.waitForLoadState('networkidle');
-    if (await page.locator('#duplicateWarning').count() !== 1) throw new Error('duplicate mail should show W003');
-    const dupNo = (await page.locator('#duplicateWarning code').first().textContent()).trim();
-    if (dupNo !== a.applicantNo) throw new Error('W003 should list ' + a.applicantNo + ' but got ' + dupNo);
-    await shot(page, 'SC04-duplicate');
-    console.log('OK  同じメールアドレスの発行済みアカウントを警告（W003）: ' + dupNo);
-    // 別の申込者として一時保存（未紐づけ）→ 再表示で紐づけ候補を案内 → 申込者番号を入れて紐づける
-    await page.locator('label[for=allowDuplicate]').click();
-    await page.click('button[value=save]'); await page.waitForURL(/\/edit$/);
-    if (await page.locator('#duplicateWarning').count() !== 0) throw new Error('allowDuplicate should save without W003');
-    if (!(await page.locator('#linkCandidates').textContent()).includes(dupNo)) throw new Error('unlinked application should show link candidate ' + dupNo);
-    console.log('OK  未紐づけの申込の再表示で紐づけ候補を案内: ' + dupNo);
-    await page.fill('#applicantNo', dupNo); await page.fill('#optionFee', '0'); await page.fill('#handlingFee', '0');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/menu');
+    if (await page.locator('#tile-additional.tile-disabled').count() !== 0) throw new Error('20701: 追加申込 should be enabled');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/additional');
+    if ((await page.inputValue('#applicantName')) !== TARO.name || (await page.inputValue('#mailAddress')) !== TARO.mail) throw new Error('additional: applicant data should be copied from the source');
+    if (!(await page.locator('#accountNote').textContent()).includes(a.applicantNo)) throw new Error('additional: should show the inherited account ' + a.applicantNo);
+    await page.fill('#address', '東京都港区芝公園4-2-8'); await page.fill('#remarks', '追加申込（住所を変更）');
+    await shot(page, 'SC04-additional');
     await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
     await page.click('#confirmBtn'); await page.waitForURL(/\/menu$/);
-    const c = { appId: page.url().split('/').slice(-2)[0] };
-    if (await applicantNoOnMenu(page) !== a.applicantNo) throw new Error('second application should be linked to the existing account');
-    console.log('OK  2 件目の申込を既存の申込者アカウントに紐づけ: ' + a.applicantNo);
+    const add = { appId: page.url().split('/').slice(-2)[0] };
+    if (await applicantNoOnMenu(page) !== a.applicantNo) throw new Error('additional application should inherit the account ' + a.applicantNo);
+    await shot(page, 'SC14-additional');
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/change/confirm?group=3');
+    const srcText = await page.locator('.version-table').first().textContent();
+    if (srcText.includes('芝公園') || !srcText.includes('丸の内')) throw new Error('editing the additional application must not change the source application data');
+    console.log('OK  追加申込：アカウント ' + a.applicantNo + ' を引き継ぎ、申込者情報は複写した別データ（元の申込の住所は変わらない）');
+
+    // ---------- 同じ氏名・メールアドレスの新規申込は別の申込者 → 申込取消 ----------
+    const c = await createApplication(page, { name: TARO.name, mail: 'TARO.YAMADA@example.com' }, '800000', '0');
+    if (await applicantNoOnMenu(page) !== null) throw new Error('new application should not be linked to an existing account');
+    await applyApproval(page, c.appId, { approvers: [] }); await expectStatus(page, '10301', '同じ氏名・メールの新規申込 回付先なし');
+    await page.goto(BASE + '/emp/applications/' + c.appId + '/menu'); c.applicantNo = await applicantNoOnMenu(page);
+    if (!c.applicantNo || c.applicantNo === a.applicantNo) throw new Error('same name/mail new application should get its own account, got ' + c.applicantNo);
+    console.log('OK  同じ氏名・メールアドレスの新規申込は別の申込者（新しいアカウント ' + c.applicantNo + '。元は ' + a.applicantNo + '）');
     await menuAction(page, c.appId, 'cancel', '申込者の都合により取消'); await expectStatus(page, '90101', '申込取消');
     await shot(page, 'SC14-90101');
+    if (await page.locator('#tile-additional.tile-disabled').count() !== 1) throw new Error('90101: 追加申込 should be disabled');
     await logout(page);
 
     // ---------- 会社B（事前確認あり）----------
@@ -402,19 +409,18 @@ async function portalLogin(apPage, id, pw) {
     await shot(page, 'SC14-B-final');
     // 一括取込
     await page.goto(BASE + '/emp/import');
-    const csv = '\ufeff申込者番号,申込者名,申込者名カナ,メールアドレス,電話番号,住所,商品コード,基本料金,オプション料金,事務手数料,契約開始日,契約終了日,備考\n'
-      + ',高橋 美咲,タカハシ ミサキ,misaki.takahashi@example.com,052-000-0004,愛知県名古屋市中区栄4-4-4,PRD002,500000,0,0,2026-10-01,2027-09-30,新規の申込者\n'
-      + b.applicantNo + ',佐藤 次郎,サトウ ジロウ,jiro.sato@example.com,,,PRD001,700000,0,0,2026-10-01,2027-09-30,発行済みのアカウントに紐づけ\n'
-      + ',高橋 美咲,タカハシ ミサキ,misaki.takahashi@example.com,,,PRD001,300000,0,0,,,同じファイルの同じ申込者（アカウントは一次承認で発行）\n'
-      + ',田中 健一,タナカ ケンイチ,kenichi.tanaka@example.com,,,PRD001,abc,0,0,2026-10-01,2026-09-01,エラー行\n'
-      + 'C0000009999,,,,,,PRD001,1000,0,0,,,存在しない申込者\n'
-      + ',別人 花子,,jiro.sato@example.com,,,PRD001,1000,0,0,,,登録済みと同じメールアドレス\n';
+    const csv = '\ufeff申込者名,申込者名カナ,メールアドレス,電話番号,住所,商品コード,基本料金,オプション料金,事務手数料,契約開始日,契約終了日,備考\n'
+      + '高橋 美咲,タカハシ ミサキ,misaki.takahashi@example.com,052-000-0004,愛知県名古屋市中区栄4-4-4,PRD002,500000,0,0,2026-10-01,2027-09-30,新規申込\n'
+      + '佐藤 次郎,サトウ ジロウ,jiro.sato@example.com,,,PRD001,700000,0,0,2026-10-01,2027-09-30,既存の申込と同じ氏名・メールアドレス（別の申込者）\n'
+      + '高橋 美咲,タカハシ ミサキ,misaki.takahashi@example.com,,,PRD001,300000,0,0,,,同じファイルの同じ氏名・メールアドレス（別の申込者）\n'
+      + '田中 健一,タナカ ケンイチ,kenichi.tanaka@example.com,,,PRD001,abc,0,0,2026-10-01,2026-09-01,エラー行\n'
+      + '鈴木 一郎,,,,,PRD001,1000,0,0,,,メールアドレスなし\n';
     await page.setInputFiles('input[name=file]', { name: 'import.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf8') });
     await page.click('button:has-text("取込実行")'); await page.waitForLoadState('networkidle'); await shot(page, 'SC10');
     const importText = (await page.locator('.card-body').nth(1).textContent()).replace(/\s+/g, ' ');
     console.log('    import:', importText.slice(0, 120));
-    if (!/成功：\s*3/.test(importText) || !/エラー：\s*3/.test(importText)) throw new Error('import should succeed 3 and fail 3: ' + importText.slice(0, 200));
-    console.log('OK  一括取込：申込者情報は申込データとして取込、申込者番号の行は既存アカウントに紐づけ、エラー 3 行（形式・存在しない番号・発行済みと同じメール）');
+    if (!/成功：\s*3/.test(importText) || !/エラー：\s*2/.test(importText)) throw new Error('import should succeed 3 and fail 2: ' + importText.slice(0, 200));
+    console.log('OK  一括取込：申込者情報は申込データとして取込、同じ氏名・メールアドレスの行も別の申込者として登録、エラー 2 行（形式・メールアドレスなし）');
     await logout(page);
     // 管理者：マスタ画面
     await login(page, 'A009'); await page.goto(BASE + '/emp/master/employees'); await shot(page, 'SC11');

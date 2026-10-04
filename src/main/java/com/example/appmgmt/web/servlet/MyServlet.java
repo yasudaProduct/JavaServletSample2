@@ -243,7 +243,7 @@ public class MyServlet extends BaseServlet {
         switch (op) {
             case "edit": {
                 ApplicationForm form = ApplicationForm.bind(req);
-                Validation errors = form.validate(true, false, false);
+                Validation errors = form.validate(true, false);
                 if (errors.hasErrors()) {
                     req.setAttribute("v", cs.resolve(r));
                     req.setAttribute("consentBase", base);

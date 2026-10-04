@@ -120,7 +120,7 @@ public class ConsentServlet extends BaseServlet {
         switch (sub) {
             case "edit": {
                 ApplicationForm form = ApplicationForm.bind(req);
-                Validation errors = form.validate(true, false, false);
+                Validation errors = form.validate(true, false);
                 if (errors.hasErrors()) {
                     req.setAttribute("form", form);
                     req.setAttribute("errors", errors.getErrors());

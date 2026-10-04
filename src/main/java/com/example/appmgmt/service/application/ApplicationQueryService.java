@@ -216,7 +216,8 @@ public class ApplicationQueryService {
             }
         }
         if (owner) {
-            if (!StatusCd.isCanceled(st)) {
+            // 追加申込（同じ申込者の新しい申込）は元の申込が審査完了のときだけ
+            if (StatusCd.REVIEWED_ALL.contains(st)) {
                 a.add("additional");
             }
             // 取消（操作コード 15）は遷移マスタに該当行があるステータスだけ
@@ -273,17 +274,6 @@ public class ApplicationQueryService {
             }
             return detail(conn, applicationId, null, true);
         });
-    }
-
-    /**
-     * 同じメールアドレス（申込データの現行版）で申込者アカウントが発行済みの申込者（重複の確認 W003）。
-     * 同じ申込者の 2 件目以降でアカウントを重複して発行しないよう、申込者番号の指定を促すために使う。
-     */
-    public List<Applicant> duplicateAccounts(String mailAddress, Long excludeApplicationId) {
-        if (mailAddress == null || mailAddress.isBlank()) {
-            return List.of();
-        }
-        return Tx.execute(conn -> applicationDao.findAccountHoldersByMail(conn, mailAddress, excludeApplicationId));
     }
 
     public ApplicationVersion currentVersion(Connection conn, Application app) {

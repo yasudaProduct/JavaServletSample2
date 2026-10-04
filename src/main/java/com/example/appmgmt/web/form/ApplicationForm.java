@@ -10,10 +10,8 @@ import javax.servlet.http.HttpServletRequest;
 /**
  * 申込内容の入力フォーム（SC04／SC07／SC08／AP02 共通）。入力値は文字列で保持し、チェック後に版へ変換する。
  * 申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）も申込データとしてここで扱う。
- * applicantNo は申込者アカウントのユーザー ID で、同じ申込者の 2 件目以降に既存のアカウントへ紐づけるときだけ入力する（任意）。
  */
 public class ApplicationForm {
-    private String applicantNo = "";
     private String applicantName = "";
     private String applicantKana = "";
     private String telNo = "";
@@ -29,7 +27,6 @@ public class ApplicationForm {
 
     public static ApplicationForm bind(HttpServletRequest req) {
         ApplicationForm f = new ApplicationForm();
-        f.applicantNo = p(req, "applicantNo");
         f.applicantName = p(req, "applicantName");
         f.applicantKana = p(req, "applicantKana");
         f.telNo = p(req, "telNo");
@@ -77,18 +74,10 @@ public class ApplicationForm {
     /**
      * 入力チェック（14. 共通仕様 6 章の順序）。
      * @param full true = 必須・相関を含む（確認へ・確定）、false = 桁・書式のみ（一時保存）
-     * @param checkApplicantNo 申込者番号（既存アカウントへの紐づけ。任意）の書式を検証する
      * @param amountsOnly 金額項目だけを検証する（SC07 の一部修正）
      */
-    public Validation validate(boolean full, boolean checkApplicantNo, boolean amountsOnly) {
+    public Validation validate(boolean full, boolean amountsOnly) {
         Validation v = new Validation();
-        if (checkApplicantNo && !amountsOnly && !applicantNo.isEmpty()) {
-            if (applicantNo.length() > 12) {
-                v.reject("applicantNo", "E002", "申込者番号", 12);
-            } else if (!Validation.isAlnum(applicantNo)) {
-                v.reject("applicantNo", "E003", "申込者番号");
-            }
-        }
         if (!amountsOnly) {
             validateApplicant(v, full);
             if (full && productCd.isEmpty()) {
@@ -221,7 +210,6 @@ public class ApplicationForm {
         return v;
     }
 
-    public String getApplicantNo() { return applicantNo; }
     public String getApplicantName() { return applicantName; }
     public String getApplicantKana() { return applicantKana; }
     public String getTelNo() { return telNo; }

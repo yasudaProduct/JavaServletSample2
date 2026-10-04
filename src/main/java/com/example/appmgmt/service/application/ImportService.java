@@ -6,13 +6,10 @@ import com.example.appmgmt.common.Formats;
 import com.example.appmgmt.common.Messages;
 import com.example.appmgmt.common.Tx;
 import com.example.appmgmt.common.Validation;
-import com.example.appmgmt.dao.ApplicantAccountDao;
 import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.ImportBatchDao;
 import com.example.appmgmt.dao.StatusHistoryDao;
-import com.example.appmgmt.domain.Applicant;
-import com.example.appmgmt.domain.ApplicantAccount;
 import com.example.appmgmt.domain.Application;
 import com.example.appmgmt.domain.ApplicationVersion;
 import com.example.appmgmt.domain.Codes;
@@ -36,25 +33,23 @@ import java.util.Optional;
 public class ImportService {
 
     /**
-     * 列：申込者番号（任意）＋申込者情報（申込者名・カナ・メールアドレス・電話番号・住所）＋申込内容。
-     * 申込者情報は申込データとして第 1 版に持つ（全行必須）。申込者番号は同じ申込者の 2 件目以降で、発行済みの申込者アカウントに紐づけるときだけ指定する。
+     * 列：申込者情報（申込者名・カナ・メールアドレス・電話番号・住所）＋申込内容。申込者情報は申込データとして第 1 版に持つ。
+     * 取込は新規申込なので、同じ氏名・メールアドレスの行があっても別の申込者として登録する（申込者アカウントは一次承認で新しく発行する）。
      */
-    public static final String[] HEADER = {"申込者番号", "申込者名", "申込者名カナ", "メールアドレス", "電話番号", "住所",
+    public static final String[] HEADER = {"申込者名", "申込者名カナ", "メールアドレス", "電話番号", "住所",
             "商品コード", "基本料金", "オプション料金", "事務手数料", "契約開始日", "契約終了日", "備考"};
-    private static final int C_PRODUCT = 6;
+    private static final int C_PRODUCT = 5;
     public static final int MAX_ROWS = 1000;
     public static final long MAX_SIZE = 5L * 1024 * 1024;
 
     private final ApplicationDao applicationDao;
     private final ApplicationVersionDao versionDao;
-    private final ApplicantAccountDao accountDao;
     private final ImportBatchDao importBatchDao;
     private final StatusHistoryDao historyDao;
 
-    public ImportService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantAccountDao accountDao, ImportBatchDao importBatchDao, StatusHistoryDao historyDao) {
+    public ImportService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ImportBatchDao importBatchDao, StatusHistoryDao historyDao) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
-        this.accountDao = accountDao;
         this.importBatchDao = importBatchDao;
         this.historyDao = historyDao;
     }
@@ -132,35 +127,12 @@ public class ImportService {
                 int lineNo = lineNos.get(i);
                 List<String> errors = new ArrayList<>();
                 ApplicationVersion v = new ApplicationVersion();
-                Long accountId = null;
                 if (row.size() != HEADER.length) {
                     errors.add("列数が正しくありません（" + HEADER.length + " 列必要）。");
                 } else {
-                    // 申込者情報は申込データとして版に持つ（全行必須）
+                    // 申込者情報は申込データとして版に持つ（申込者名・メールアドレスは必須）
                     applyProfile(v, row);
-                    int before = errors.size();
                     validateProfile(v, errors);
-                    String accountNo = row.get(0).trim();
-                    if (!accountNo.isEmpty()) {
-                        // 同じ申込者の 2 件目以降：発行済みの申込者アカウントに紐づける
-                        if (accountNo.length() > 12) {
-                            errors.add(Messages.get("E002", "申込者番号", 12));
-                        } else {
-                            ApplicantAccount acc = accountDao.findByNo(conn, accountNo).orElse(null);
-                            if (acc == null) {
-                                errors.add("申込者番号 " + accountNo + " の申込者アカウントは存在しません。");
-                            } else {
-                                accountId = acc.getApplicantId();
-                            }
-                        }
-                    } else if (errors.size() == before) {
-                        // 申込者番号なし：同じメールアドレスで申込者アカウントが発行済みならエラー（アカウントの重複を防ぐ）
-                        List<Applicant> dup = applicationDao.findAccountHoldersByMail(conn, v.getMailAddress(), null);
-                        if (!dup.isEmpty()) {
-                            errors.add("メールアドレス " + v.getMailAddress() + " の申込者アカウント（" + dup.get(0).getApplicantNo() + " " + dup.get(0).getApplicantName()
-                                    + "）が発行済みです。同じ申込者なら申込者番号を指定してください。");
-                        }
-                    }
                     String productCd = row.get(C_PRODUCT).trim();
                     if (productCd.isEmpty()) {
                         errors.add(Messages.get("E001", "商品コード"));
@@ -204,7 +176,7 @@ public class ImportService {
                 }
                 Application app = new Application();
                 app.setApplicationNo(applicationDao.nextApplicationNo(conn));
-                app.setApplicantId(accountId);
+                app.setApplicantId(null);
                 app.setOwnerEmployeeId(user.getEmployeeId());
                 app.setCompanyDiv(user.getCompanyDiv());
                 app.setDeptCd(user.getDeptCd());
@@ -281,11 +253,11 @@ public class ImportService {
 
     /** 申込者情報の列（2〜6 列）を版に写す。空の任意項目は null。 */
     private static void applyProfile(ApplicationVersion v, List<String> row) {
-        v.setApplicantName(row.get(1).trim());
-        v.setApplicantKana(row.get(2).trim().isEmpty() ? null : row.get(2).trim());
-        v.setMailAddress(row.get(3).trim());
-        v.setTelNo(row.get(4).trim().isEmpty() ? null : row.get(4).trim());
-        v.setAddress(row.get(5).trim().isEmpty() ? null : row.get(5).trim());
+        v.setApplicantName(row.get(0).trim());
+        v.setApplicantKana(row.get(1).trim().isEmpty() ? null : row.get(1).trim());
+        v.setMailAddress(row.get(2).trim());
+        v.setTelNo(row.get(3).trim().isEmpty() ? null : row.get(3).trim());
+        v.setAddress(row.get(4).trim().isEmpty() ? null : row.get(4).trim());
     }
 
     /** 申込者情報の列チェック（SC04 の申込者情報と同じ。申込者名・メールアドレスは必須）。 */

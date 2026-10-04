@@ -6,7 +6,6 @@ import com.example.appmgmt.common.Formats;
 import com.example.appmgmt.common.OptimisticLockException;
 import com.example.appmgmt.common.TransitionNotAllowedException;
 import com.example.appmgmt.common.Tx;
-import com.example.appmgmt.dao.ApplicantAccountDao;
 import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.ExternalLinkDao;
@@ -33,17 +32,15 @@ public class ApplicationService {
 
     private final ApplicationDao applicationDao;
     private final ApplicationVersionDao versionDao;
-    private final ApplicantAccountDao accountDao;
     private final StatusHistoryDao historyDao;
     private final ExternalLinkDao externalLinkDao;
     private final StatusTransitionService transitionService;
     private final ConsentIssuer consentIssuer;
 
-    public ApplicationService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantAccountDao accountDao, StatusHistoryDao historyDao,
+    public ApplicationService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, StatusHistoryDao historyDao,
                               ExternalLinkDao externalLinkDao, StatusTransitionService transitionService, ConsentIssuer consentIssuer) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
-        this.accountDao = accountDao;
         this.historyDao = historyDao;
         this.externalLinkDao = externalLinkDao;
         this.transitionService = transitionService;
@@ -73,10 +70,11 @@ public class ApplicationService {
     /**
      * 新規申込（登録区分 2）または追加申込（登録区分 3）を作成する。ステータス 10101、第 1 版、履歴 00。
      * 申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）は申込データとして第 1 版に持つ。
-     * 申込者アカウントは原則として一次承認が通ったときに発行して紐づける。同じ申込者の 2 件目以降は accountNo（発行済みのユーザー ID）を
-     * 指定して既存のアカウントに紐づけ、追加申込は元の申込のアカウントを引き継ぐ。
+     * 新規申込は同じ氏名・メールアドレスでも別の申込者として扱い、申込者アカウントは一次承認が通ったときに新しく発行して紐づける。
+     * 追加申込（同じ申込者の新しい申込）は元の申込が審査完了（10701／20701）のときだけ作れ、元の申込のアカウントを引き継ぐ。
+     * 申込者情報・申込内容は画面で複写した値を初期値にした別データ（元の申込とは独立）。
      */
-    public long create(LoginUser user, String accountNo, ApplicationVersion content, Long sourceApplicationId) {
+    public long create(LoginUser user, ApplicationVersion content, Long sourceApplicationId) {
         if (!user.isOwner()) {
             throw new ForbiddenException();
         }
@@ -87,9 +85,10 @@ public class ApplicationService {
                 if (src.getOwnerEmployeeId() != user.getEmployeeId()) {
                     throw new ForbiddenException();
                 }
+                if (!StatusCd.REVIEWED_ALL.contains(src.getStatusCd())) {
+                    throw new TransitionNotAllowedException();
+                }
                 accountId = src.getApplicantId();
-            } else if (accountNo != null && !accountNo.isEmpty()) {
-                accountId = accountDao.findByNo(conn, accountNo).orElseThrow(() -> new BusinessException("E009", "申込者番号")).getApplicantId();
             }
             Application app = new Application();
             app.setApplicationNo(applicationDao.nextApplicationNo(conn));
@@ -126,19 +125,8 @@ public class ApplicationService {
 
     /** 一時保存（10101／20101）。現行版（申込者情報を含む申込内容）をそのまま更新する。遷移・履歴なし。 */
     public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, LoginUser user) {
-        saveDraft(applicationId, rowVersion, content, null, user);
-    }
-
-    /**
-     * 一時保存。申込者アカウントが未発行の申込で accountNo（発行済みのユーザー ID）を渡すと、そのアカウントに紐づける。
-     */
-    public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, String accountNo, LoginUser user) {
         Tx.executeVoid(conn -> {
             Application app = load(conn, applicationId, rowVersion, user, Set.of(StatusCd.INPUT, StatusCd.CHG_INPUT));
-            if (accountNo != null && !accountNo.isEmpty() && app.getApplicantId() == null) {
-                long accountId = accountDao.findByNo(conn, accountNo).orElseThrow(() -> new BusinessException("E009", "申込者番号")).getApplicantId();
-                applicationDao.linkAccount(conn, applicationId, accountId);
-            }
             ApplicationVersion v = versionDao.get(conn, applicationId, app.getCurrentVersionNo());
             applyContent(v, content);
             v.setAmountRatio(null);
