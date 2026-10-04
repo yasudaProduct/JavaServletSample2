@@ -7,6 +7,8 @@ import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.ApprovalRequestDao;
 import com.example.appmgmt.dao.ApprovalRouteDao;
+import com.example.appmgmt.dao.ApplicationPdfDao;
+import com.example.appmgmt.dao.ConsentDocumentDao;
 import com.example.appmgmt.dao.CompanyDivDao;
 import com.example.appmgmt.dao.DepartmentDao;
 import com.example.appmgmt.dao.EmployeeDao;
@@ -28,6 +30,8 @@ import com.example.appmgmt.service.auth.ApplicantAuthService;
 import com.example.appmgmt.service.auth.AuthService;
 import com.example.appmgmt.service.consent.ConsentIssuer;
 import com.example.appmgmt.service.consent.ConsentService;
+import com.example.appmgmt.service.document.ApplicationPdfService;
+import com.example.appmgmt.service.document.ConsentDocumentService;
 import com.example.appmgmt.service.external.ExternalRequestBuilder;
 import com.example.appmgmt.service.external.ExternalResultService;
 import com.example.appmgmt.service.master.MasterService;
@@ -54,6 +58,8 @@ public final class Services {
     private final ExternalLinkDao externalLinkDao = new ExternalLinkDao();
     private final NotificationDao notificationDao = new NotificationDao();
     private final StatusHistoryDao statusHistoryDao = new StatusHistoryDao();
+    private final ConsentDocumentDao consentDocumentDao = new ConsentDocumentDao();
+    private final ApplicationPdfDao applicationPdfDao = new ApplicationPdfDao();
 
     private final NotificationService notificationService;
     private final ConsentIssuer consentIssuer;
@@ -68,6 +74,8 @@ public final class Services {
     private final ExternalResultService externalResultService;
     private final AuthService authService;
     private final MasterService masterService;
+    private final ConsentDocumentService consentDocumentService;
+    private final ApplicationPdfService applicationPdfService;
     private final MailSender mailSender;
     private final ExternalApiClient externalApiClient;
     private final NotificationSendJob notificationSendJob;
@@ -79,12 +87,15 @@ public final class Services {
         applicantAuthService = new ApplicantAuthService(applicantAccountDao, applicationDao, notificationService);
         statusTransitionService = new StatusTransitionService(applicationDao, applicationVersionDao, companyDivDao, statusTransitionDao, statusHistoryDao,
                 approvalRequestDao, applicantConsentDao, externalLinkDao, notificationService, consentIssuer, applicantAuthService);
+        consentDocumentService = new ConsentDocumentService(consentDocumentDao);
+        applicationPdfService = new ApplicationPdfService(applicationPdfDao, applicationVersionDao, applicantConsentDao, consentDocumentDao);
+        statusTransitionService.setApplicationPdfService(applicationPdfService);
         applicationQueryService = new ApplicationQueryService(applicationDao, applicationVersionDao, applicantAccountDao, employeeDao, statusDao, companyDivDao,
                 approvalRequestDao, applicantConsentDao, externalLinkDao, statusHistoryDao, statusTransitionDao, departmentDao);
         applicationService = new ApplicationService(applicationDao, applicationVersionDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer, companyDivDao, departmentDao, employeeDao);
         importService = new ImportService(applicationDao, applicationVersionDao, importBatchDao, statusHistoryDao);
         approvalService = new ApprovalService(applicationDao, approvalRequestDao, approvalRouteDao, employeeDao, applicationQueryService, statusTransitionService, notificationService);
-        consentService = new ConsentService(applicantConsentDao, applicationDao, applicationVersionDao, applicantAccountDao, statusDao, statusTransitionService);
+        consentService = new ConsentService(applicantConsentDao, applicationDao, applicationVersionDao, applicantAccountDao, statusDao, statusTransitionService, consentDocumentService);
         externalRequestBuilder = new ExternalRequestBuilder(applicationDao, applicationVersionDao, applicantAccountDao);
         externalResultService = new ExternalResultService(externalLinkDao, applicationDao, statusTransitionService);
         authService = new AuthService(employeeDao, companyDivDao);
@@ -135,6 +146,8 @@ public final class Services {
     public ExternalResultService getExternalResultService() { return externalResultService; }
     public AuthService getAuthService() { return authService; }
     public MasterService getMasterService() { return masterService; }
+    public ConsentDocumentService getConsentDocumentService() { return consentDocumentService; }
+    public ApplicationPdfService getApplicationPdfService() { return applicationPdfService; }
     public MailSender getMailSender() { return mailSender; }
     public ExternalApiClient getExternalApiClient() { return externalApiClient; }
     public NotificationSendJob getNotificationSendJob() { return notificationSendJob; }

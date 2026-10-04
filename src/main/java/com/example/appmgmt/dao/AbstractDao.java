@@ -105,6 +105,8 @@ public abstract class AbstractDao {
                 ps.setTimestamp(idx, Timestamp.valueOf((LocalDateTime) p));
             } else if (p instanceof Boolean) {
                 ps.setBoolean(idx, (Boolean) p);
+            } else if (p instanceof byte[]) {
+                ps.setBytes(idx, (byte[]) p);
             } else {
                 ps.setObject(idx, p);
             }

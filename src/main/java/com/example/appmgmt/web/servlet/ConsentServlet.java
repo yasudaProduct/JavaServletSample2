@@ -97,6 +97,18 @@ public class ConsentServlet extends BaseServlet {
             case "complete":
                 render(req, res, "consent/ap04_complete.jsp");
                 return;
+            case "terms": {
+                // AP03 の同意事項 PDF（/consent/{token}/terms/{文書コード}/{版番号}）。開いたことを記録する
+                Long ver = parts.size() > 3 ? parseId(parts.get(3)) : null;
+                if (ver == null) {
+                    res.sendError(404);
+                    return;
+                }
+                com.example.appmgmt.domain.ConsentDocumentVersion d = services().getConsentService()
+                        .openDocument(services().getConsentService().byToken(token), parts.get(2), ver.intValue());
+                sendPdf(res, d.getData(), d.getFileName());
+                return;
+            }
             default:
                 res.sendError(404);
         }

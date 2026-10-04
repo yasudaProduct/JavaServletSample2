@@ -60,6 +60,22 @@ public class MasterServlet extends BaseServlet {
             case "departments":
                 showDepartments(req, res, null, null);
                 return;
+            case "consent-documents":
+                if (parts.size() >= 3) {
+                    // 版の PDF（/emp/master/consent-documents/{文書コード}/{版番号}）
+                    Long ver = parseId(parts.get(2));
+                    if (ver == null) {
+                        res.sendError(404);
+                        return;
+                    }
+                    com.example.appmgmt.domain.ConsentDocumentVersion v = services().getConsentDocumentService().versionFile(sub, ver.intValue());
+                    sendPdf(res, v.getData(), v.getFileName());
+                    return;
+                }
+                req.setAttribute("documents", services().getConsentDocumentService().allWithVersions());
+                req.setAttribute("now", java.time.LocalDateTime.now());
+                render(req, res, "emp/master/consent_documents.jsp");
+                return;
             case "company-divs":
                 req.setAttribute("companyDivs", services().getMasterService().companyDivs());
                 req.setAttribute("errors", java.util.Map.of());
@@ -157,9 +173,97 @@ public class MasterServlet extends BaseServlet {
             case "employees": postEmployee(req, res, user, sub); return;
             case "company-divs": postCompanyDivs(req, res); return;
             case "departments": postDepartment(req, res); return;
+            case "consent-documents": postConsentDocument(req, res); return;
             case "approval-routes": postRoute(req, res, sub); return;
             default: res.sendError(404);
         }
+    }
+
+    /**
+     * SC17 同意事項マスタの更新。mode = new（文書の追加）、edit（名称・対象・表示順・有効の更新）、upload（新しい版の PDF の登録）。
+     * 入力の誤りは画面上部にメッセージで返す。
+     */
+    private void postConsentDocument(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+        String mode = param(req, "mode");
+        com.example.appmgmt.service.document.ConsentDocumentService svc = services().getConsentDocumentService();
+        String back = "/emp/master/consent-documents";
+        switch (mode) {
+            case "new":
+            case "edit": {
+                com.example.appmgmt.domain.ConsentDocument d = new com.example.appmgmt.domain.ConsentDocument();
+                d.setDocumentCd(param(req, "documentCd"));
+                d.setDocumentName(param(req, "documentName"));
+                d.setTargetType(param(req, "targetType"));
+                d.setDisplayOrder(intParam(req, "displayOrder", -1));
+                d.setValidFlg("new".equals(mode) || "1".equals(param(req, "validFlg")) ? Codes.FLG_ON : Codes.FLG_OFF);
+                if ("new".equals(mode) && !d.getDocumentCd().matches("[A-Z0-9_]{1,20}")) {
+                    throw new BusinessException("E003", "文書コード（半角英大文字・数字・_ の 20 桁以内）");
+                }
+                if (d.getDocumentName().isEmpty()) {
+                    throw new BusinessException("E001", "文書名");
+                }
+                if (d.getDocumentName().length() > 100) {
+                    throw new BusinessException("E002", "文書名", 100);
+                }
+                if (!List.of(Codes.DOC_TARGET_NEW, Codes.DOC_TARGET_CHANGE, Codes.DOC_TARGET_COMMON).contains(d.getTargetType())) {
+                    throw new BusinessException("E011", "対象");
+                }
+                if (d.getDisplayOrder() < 0 || d.getDisplayOrder() > 999) {
+                    throw new BusinessException("E003", "表示順（0〜999）");
+                }
+                if ("new".equals(mode)) {
+                    svc.addDocument(d);
+                } else {
+                    svc.updateDocument(d, intParam(req, "rowVersion", -1));
+                }
+                flashMessage(req, "success", "I001");
+                redirect(req, res, back);
+                return;
+            }
+            case "upload": {
+                String documentCd = param(req, "documentCd");
+                java.time.LocalDateTime from = parseDateTime(param(req, "effectiveFrom"));
+                if (from == null) {
+                    throw new BusinessException("E003", "適用開始日時");
+                }
+                String remarks = param(req, "remarks");
+                if (remarks.length() > 200) {
+                    throw new BusinessException("E002", "改定内容", 200);
+                }
+                javax.servlet.http.Part part;
+                try {
+                    part = req.getPart("file");
+                } catch (IllegalStateException e) {
+                    throw new BusinessException("E120");
+                }
+                if (part == null || part.getSize() == 0) {
+                    throw new BusinessException("E120");
+                }
+                byte[] data;
+                try (java.io.InputStream in = part.getInputStream()) {
+                    data = in.readAllBytes();
+                }
+                String fileName = part.getSubmittedFileName() == null ? documentCd + ".pdf" : part.getSubmittedFileName();
+                int ver = svc.addVersion(documentCd, from, fileName.length() > 200 ? fileName.substring(0, 200) : fileName, data, remarks);
+                flash(req, "success", "同意事項 " + documentCd + " の第 " + ver + " 版を登録しました（適用開始 " + Formats.dateTime(from) + "）。");
+                redirect(req, res, back);
+                return;
+            }
+            default:
+                res.sendError(404);
+        }
+    }
+
+    /** yyyy/MM/dd HH:mm または datetime-local（yyyy-MM-ddTHH:mm）。 */
+    private static java.time.LocalDateTime parseDateTime(String s) {
+        for (String pattern : new String[] {"yyyy/MM/dd HH:mm", "yyyy-MM-dd'T'HH:mm"}) {
+            try {
+                return java.time.LocalDateTime.parse(s, java.time.format.DateTimeFormatter.ofPattern(pattern).withResolverStyle(java.time.format.ResolverStyle.SMART));
+            } catch (java.time.format.DateTimeParseException e) {
+                // 次の書式
+            }
+        }
+        return null;
     }
 
     private void postEmployee(HttpServletRequest req, HttpServletResponse res, LoginUser user, String sub) throws ServletException, IOException {

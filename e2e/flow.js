@@ -40,6 +40,43 @@ async function accountFor(page, appNo) {
   const pw = body.match(/初期パスワード：(\S+)/)[1];
   return { id, pw };
 }
+// AP03：同意事項 PDF。開く前は同意できない（tryAgreeFirst なら E118 を確認）。各 PDF を取得してサーバーに閲覧を記録し、画面のリンク操作で確認済みにする
+async function viewConsentDocs(p, label, { expectDocs = null, tryAgreeFirst = false } = {}) {
+  const items = p.locator('.consent-doc');
+  const n = await items.count();
+  const names = (await items.allTextContents()).map(t => t.replace(/\s+/g, ' ').trim());
+  if (expectDocs) {
+    for (const d of expectDocs) { if (!names.some(t => t.includes(d))) throw new Error(`[${label}] consent documents should include ${d}: ${names.join(' / ')}`); }
+  }
+  if (n > 0 && !(await p.locator('#agreed').isDisabled())) throw new Error(`[${label}] agree checkbox should be disabled until all PDFs are opened`);
+  if (tryAgreeFirst) {
+    await p.evaluate(() => { const c = document.getElementById('agreed'); c.disabled = false; c.checked = true; document.getElementById('agreeBtn').disabled = false; });
+    await p.click('#agreeBtn'); await p.waitForLoadState('networkidle');
+    if (!(await alerts(p)).includes('すべての同意事項')) throw new Error(`[${label}] agreeing without opening the PDFs should be rejected (E118): ` + await alerts(p));
+  }
+  // ヘッドレスでは PDF のタブを開かず、リンクの既定動作だけ止めて画面側の処理（確認済みの表示）を動かす
+  await p.evaluate(() => document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.doc-open')) e.preventDefault(); }, true));
+  for (let i = 0; i < n; i++) {
+    const link = items.nth(i).locator('.doc-open');
+    const r = await p.request.get(BASE + await link.getAttribute('href'));
+    const body = await r.body();
+    if (r.headers()['content-type'] !== 'application/pdf' || body.slice(0, 5).toString() !== '%PDF-') throw new Error(`[${label}] consent document should be a PDF: ` + r.headers()['content-type']);
+    await link.click();
+  }
+  if (n > 0 && await p.locator('#agreed').isDisabled()) throw new Error(`[${label}] agree checkbox should be enabled after opening all PDFs`);
+  await p.reload();
+  if (n > 0 && (await p.locator('#agreed').isDisabled() || await p.locator('.doc-viewed:visible').count() !== n)) throw new Error(`[${label}] viewed state should be kept on the server`);
+  return names;
+}
+async function pdfRows(p, appId, label) {
+  await p.goto(BASE + '/my/applications/' + appId + '/documents');
+  const rows = (await p.locator('#pdfTable tbody tr').allTextContents()).map(t => t.replace(/\s+/g, ' ').trim());
+  for (const href of await p.locator('#pdfTable .pdf-open').evaluateAll(els => els.map(e => e.getAttribute('href')))) {
+    const r = await p.request.get(BASE + href);
+    if (r.headers()['content-type'] !== 'application/pdf' || (await r.body()).slice(0, 5).toString() !== '%PDF-') throw new Error(`[${label}] application PDF should be a PDF`);
+  }
+  return rows;
+}
 async function applicantConsent(ctx, url, { modifyFirst = false, agree = true, returnReason = null, expectTexts = [] } = {}) {
   const page = await ctx.newPage();
   await page.goto(url);
@@ -61,6 +98,7 @@ async function applicantConsent(ctx, url, { modifyFirst = false, agree = true, r
   }
   await shot(page, 'AP01');
   await page.click('label[for=checked]'); await page.click('#confirmBtn'); await page.waitForURL('**/agree');
+  if (agree && !returnReason) { await viewConsentDocs(page, 'AP03（確認 URL）'); }
   await shot(page, 'AP03');
   if (returnReason) {
     await page.fill('#returnReason', returnReason);
@@ -242,10 +280,20 @@ async function portalLogin(apPage, id, pw) {
     await apPage.click('a:has-text("内容を修正する")'); await apPage.fill('#remarks', '申込者がポータルで備考を修正しました'); await apPage.click('button:has-text("保存")'); await apPage.waitForLoadState('networkidle');
     await shot(apPage, 'AP01-portal');
     await apPage.click('label[for=checked]'); await apPage.click('#confirmBtn'); await apPage.waitForLoadState('networkidle');
+    await shot(apPage, 'AP03-portal-before');
+    const newDocs = await viewConsentDocs(apPage, 'AP03（新規申込）', { expectDocs: ['利用規約', '重要事項説明（新規申込）', '個人情報の取扱いについて'], tryAgreeFirst: true });
+    if (newDocs.some(t => t.includes('契約変更'))) throw new Error('new application consent must not show contract change documents');
+    console.log('OK  AP03 同意事項 PDF：3 件をすべて開くまで同意できない（開かずに同意すると E118）');
     await shot(apPage, 'AP03-portal');
     await apPage.click('label[for=agreed]'); await apPage.click('#agreeBtn'); await apPage.waitForURL('**/my/menu**');
     console.log('    portal agree:', (await alerts(apPage)).slice(0, 40));
     await shot(apPage, 'AP07-after-agree');
+    const pdf1 = await pdfRows(apPage, a.appId, 'AP10 同意後');
+    if (pdf1.length !== 1 || !pdf1[0].includes('新規申込') || !pdf1[0].includes('ご同意時') || !pdf1[0].includes('有効')) throw new Error('AP10: consent PDF expected, got ' + pdf1.join(' / '));
+    const agreed1 = (await apPage.locator('#agreedDocTable tbody tr').allTextContents()).map(t => t.replace(/\s+/g, ' '));
+    if (agreed1.length !== 3 || !agreed1.every(t => t.includes('第 1 版'))) throw new Error('AP10: agreed documents (v1 x3) expected, got ' + agreed1.join(' / '));
+    await shot(apPage, 'AP10');
+    console.log('OK  同意時の申込内容 PDF を作成し、申込者メニュー（AP10）で同意した同意事項（第 1 版 × 3）とともに表示');
     await apPage.goto(BASE + '/my/applications/' + a.appId); await shot(apPage, 'AP08');
     // パスワード変更
     await apPage.goto(BASE + '/my/password'); await apPage.fill('#currentPassword', acct.pw); await apPage.fill('#newPassword', 'NewPassw0rd1'); await apPage.fill('#confirmPassword', 'NewPassw0rd1');
@@ -261,6 +309,7 @@ async function portalLogin(apPage, id, pw) {
     // SC15 はログイン用のデータ（申込者アカウント）だけを扱い、申込者情報は変更しない
     if (await page.locator('#applicantName, #updateApplicantBtn').count() !== 0) throw new Error('SC15 should not edit applicant data');
     if (!(await page.locator('#accountTable').textContent()).includes(acct.id)) throw new Error('SC15 should show the applicant account');
+    if (await page.locator('#pdfTable tbody tr').count() !== 1 || await page.locator('#agreedDocTable tbody tr').count() !== 3) throw new Error('SC15 should show the consent PDF and agreed documents');
     const noticeCards = await page.locator('.notice-card').count();
     if (noticeCards < 2) throw new Error('maintenance: expected applicant notices, got ' + noticeCards);
     page.once('dialog', d => d.accept());
@@ -292,6 +341,10 @@ async function portalLogin(apPage, id, pw) {
     const url3 = await consentUrlFor(page, a.appNo);
     await applicantConsent(ctx, url3, {});
     await page.goto(BASE + '/emp/applications/' + a.appId); await expectStatus(page, '10501', '再同意（トークン）');
+    // 同意後に同意を取り直さない変更（一部修正・基準内）：審査完了時 PDF で同意時からの変更を示す
+    await page.goto(BASE + '/emp/applications/' + a.appId + '/revise');
+    await page.fill('#optionFee', '350000'); await page.click('button:has-text("確定")'); await page.waitForLoadState('networkidle');
+    await expectStatus(page, '10501', '同意後の一部修正（基準内・同意は取り直さない）');
     // 最終承認：テンプレートと逆順（二郎 → 一郎）で申請し、次回の初期値が前回の回付先になることを確認する
     await applyApproval(page, a.appId, { approvers: ['会社A 承認 二郎（営業部）', '会社A 承認 一郎（営業部）'] }); await expectStatus(page, '10502', '最終承認申請（逆順の回付先）');
     await logout(page);
@@ -306,6 +359,10 @@ async function portalLogin(apPage, id, pw) {
     await mockResult(page, a.appNo, 'COMPLETED');
     await page.goto(BASE + '/emp/applications/' + a.appId); await expectStatus(page, '10701', '審査完了'); await shot(page, 'SC03-10701');
     await logout(page);
+    // 申込内容 PDF：同意 2 回（2 回目は基準超の修正後の再同意）と審査完了時
+    const pdf2 = await pdfRows(apPage, a.appId, 'AP10 審査完了後');
+    if (pdf2.length !== 3 || !pdf2[0].includes('審査完了時') || !pdf2[1].includes('有効') || !pdf2[2].includes('再同意により置き換え')) throw new Error('AP10 after review: ' + pdf2.join(' / '));
+    console.log('OK  審査完了時の申込内容 PDF を作成。前の同意時 PDF は「再同意により置き換え」');
 
     // ---------- 契約変更（基準内）→ 20501 → 審査差戻し → 10701、契約変更の取消 ----------
     await login(page, 'A001');
@@ -345,6 +402,31 @@ async function portalLogin(apPage, id, pw) {
     // 契約変更の同意はポータルから
     await apPage.goto(BASE + '/my/menu'); await apPage.click('#tile-consent a'); await apPage.waitForURL('**/consent'); await shot(apPage, 'AP01-portal-change');
     await apPage.click('label[for=checked]'); await apPage.click('#confirmBtn'); await apPage.waitForLoadState('networkidle');
+    const chgDocs = await viewConsentDocs(apPage, 'AP03（契約変更）', { expectDocs: ['利用規約', '重要事項説明（契約変更）'] });
+    if (chgDocs.length !== 2) throw new Error('contract change consent documents: ' + chgDocs.join(' / '));
+    // 表示中に利用規約が改定された（SC17 で第 2 版を登録）→ 同意すると E119、第 2 版を開き直してから同意する
+    await logout(page); await login(page, 'A009');
+    await page.goto(BASE + '/emp/master/consent-documents');
+    const termsCard = page.locator('#doc-TERMS');
+    await termsCard.locator('summary').click();
+    await termsCard.locator('input[name=file]').setInputFiles({ name: 'not-a-pdf.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+    await termsCard.locator('input[name=effectiveFrom]').fill(new Date(Date.now() + 9 * 3600 * 1000 - 120000).toISOString().slice(0, 16));
+    await termsCard.locator('button:has-text("新しい版を登録")').click(); await page.waitForLoadState('networkidle');
+    if (!(await alerts(page)).includes('PDF ファイル')) throw new Error('SC17: non-PDF upload should be rejected (E120): ' + await alerts(page));
+    const termsV1 = await (await page.request.get(BASE + '/emp/master/consent-documents/TERMS/1')).body();
+    await page.locator('#doc-TERMS summary').click();
+    await page.locator('#doc-TERMS input[name=file]').setInputFiles({ name: 'terms_v2.pdf', mimeType: 'application/pdf', buffer: termsV1 });
+    await page.locator('#doc-TERMS input[name=effectiveFrom]').fill(new Date(Date.now() + 9 * 3600 * 1000 - 120000).toISOString().slice(0, 16));
+    await page.locator('#doc-TERMS input[name=remarks]').fill('第 2 版（e2e で登録）');
+    await page.locator('#doc-TERMS button:has-text("新しい版を登録")').click(); await page.waitForLoadState('networkidle');
+    if (!(await alerts(page)).includes('第 2 版を登録しました')) throw new Error('SC17: upload failed: ' + await alerts(page));
+    await shot(page, 'SC17');
+    console.log('OK  SC17 同意事項マスタ：利用規約の第 2 版を登録（PDF 以外は E120）');
+    await logout(page); await login(page, 'A001');
+    await apPage.click('label[for=agreed]'); await apPage.click('#agreeBtn'); await apPage.waitForLoadState('networkidle');
+    if (!(await alerts(apPage)).includes('同意事項が改定されました')) throw new Error('AP03: agreeing after a revision should be rejected (E119): ' + await alerts(apPage));
+    const revised = await viewConsentDocs(apPage, 'AP03（改定後）', { expectDocs: ['第 2 版'] });
+    console.log('OK  表示中に同意事項が改定された場合は E119。改定後の版を開き直して同意: ' + revised.find(t => t.includes('利用規約')));
     await apPage.click('label[for=agreed]'); await apPage.click('#agreeBtn'); await apPage.waitForURL('**/my/menu**');
     await page.goto(BASE + '/emp/applications/' + a.appId); await expectStatus(page, '20501', '契約変更 同意（ポータル）');
     await applyApproval(page, a.appId); await logout(page);
@@ -352,6 +434,12 @@ async function portalLogin(apPage, id, pw) {
     await login(page, 'A003'); await approve(page, a.appId, 'review'); await expectStatus(page, '20601', '契約変更 審査申請');
     await mockResult(page, a.appNo, 'COMPLETED');
     await page.goto(BASE + '/emp/applications/' + a.appId); await expectStatus(page, '20701', '契約変更 審査完了'); await shot(page, 'SC03-20701');
+    const pdf3 = await pdfRows(apPage, a.appId, 'AP10 契約変更 審査完了後');
+    if (pdf3.length !== 5 || !pdf3[0].includes('契約変更 3') || !pdf3[0].includes('審査完了時') || !pdf3[1].includes('契約変更 3') || !pdf3[1].includes('ご同意時')) throw new Error('AP10 after contract change: ' + pdf3.join(' / '));
+    const agreed3 = (await apPage.locator('#agreedDocTable tbody tr').allTextContents()).map(t => t.replace(/\s+/g, ' '));
+    if (!agreed3[0].includes('契約変更') || !agreed3.some(t => t.includes('利用規約') && t.includes('第 2 版'))) throw new Error('AP10: contract change should be agreed with terms v2: ' + agreed3.join(' / '));
+    await shot(apPage, 'AP10-change');
+    console.log('OK  契約変更の同意時・審査完了時 PDF（' + pdf3.length + ' 件）。同意事項は改定後の利用規約 第 2 版で記録');
     await page.goto(BASE + '/emp/applications/' + a.appId + '/menu'); await shot(page, 'SC14-20701');
     await checkTiles(page, a.appId, '20701', ['新規申込', '契約変更1', '契約変更2', '契約変更3']);
     if (await page.locator('#sec-body-3.show').count() !== 1 || await page.locator('#sec-body-0.show').count() !== 0) throw new Error('20701: only the latest section should be expanded');

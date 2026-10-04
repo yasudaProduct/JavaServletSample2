@@ -76,6 +76,7 @@ public class ApplicationsServlet extends BaseServlet {
             case "": detail(req, res, user, id); break;
             case "menu": menu(req, res, user, id); break;
             case "maintenance": maintenance(req, res, user, id); break;
+            case "pdf": case "terms": sendDocument(req, res, user, id, sub, parts); break;
             case "additional": showAdditional(req, res, user, id); break;
             case "edit": showEdit(req, res, user, id); break;
             case "confirm": showConfirm(req, res, user, id); break;
@@ -351,7 +352,31 @@ public class ApplicationsServlet extends BaseServlet {
         req.setAttribute("account", d.getAccount());
         req.setAttribute("notices", notices);
         req.setAttribute("canReset", d.getAccount() != null);
+        req.setAttribute("pdfs", services().getApplicationPdfService().list(d.getApplication()));
+        req.setAttribute("agreedDocs", services().getConsentDocumentService().agreedFor(id));
         render(req, res, "emp/applications/maintenance.jsp");
+    }
+
+    /** 申込内容 PDF（/{id}/pdf/{PDF ID}）と、申込で同意された版の同意事項（/{id}/terms/{文書コード}/{版番号}）。申込を参照できる社員が開ける。 */
+    private void sendDocument(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id, String kind, List<String> parts) throws ServletException, IOException {
+        services().getApplicationQueryService().detail(id, user);
+        if ("pdf".equals(kind)) {
+            Long pdfId = parts.size() > 2 ? parseId(parts.get(2)) : null;
+            com.example.appmgmt.domain.ApplicationPdf p = pdfId == null ? null : services().getApplicationPdfService().get(id, pdfId).orElse(null);
+            if (p == null) {
+                res.sendError(404);
+                return;
+            }
+            sendPdf(res, p.getData(), p.getFileName());
+            return;
+        }
+        Long ver = parts.size() > 3 ? parseId(parts.get(3)) : null;
+        if (ver == null) {
+            res.sendError(404);
+            return;
+        }
+        com.example.appmgmt.domain.ConsentDocumentVersion v = services().getConsentDocumentService().openAgreed(id, parts.get(2), ver.intValue());
+        sendPdf(res, v.getData(), v.getFileName());
     }
 
     private void postMaintenance(HttpServletRequest req, HttpServletResponse res, LoginUser user, long id, String action) throws ServletException, IOException {

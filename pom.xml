@@ -90,6 +90,12 @@
     </dependency>
 
     <!-- テスト・ローカル起動（組込み Tomcat + H2） -->
+    <!-- PDF の作成（申込内容 PDF、サンプルの同意事項）。日本語フォントは src/main/resources/fonts に同梱（BIZ UDゴシック、OFL） -->
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>2.0.32</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

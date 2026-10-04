@@ -17,6 +17,8 @@ public class ConsentView {
     private ApplicationVersion version;
     private ApplicationVersion beforeVersion;
     private Status status;
+    /** AP03 の同意事項（適用中の版と、この同意で開いたか）。 */
+    private java.util.List<com.example.appmgmt.domain.ConsentDocument> documents = java.util.List.of();
 
     public Outcome getOutcome() { return outcome; }
     public void setOutcome(Outcome outcome) { this.outcome = outcome; }
@@ -34,5 +36,9 @@ public class ConsentView {
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
     public boolean isContractChange() { return consent != null && "2".equals(consent.getConsentType()); }
+    public java.util.List<com.example.appmgmt.domain.ConsentDocument> getDocuments() { return documents; }
+    public void setDocuments(java.util.List<com.example.appmgmt.domain.ConsentDocument> documents) { this.documents = documents; }
+    /** 同意事項をすべて開いたか（同意事項がなければ true）。 */
+    public boolean isAllDocumentsViewed() { return documents.stream().allMatch(com.example.appmgmt.domain.ConsentDocument::isViewed); }
     public String getApplicantStatusName() { return status == null ? "" : status.getApplicantStatusName(); }
 }

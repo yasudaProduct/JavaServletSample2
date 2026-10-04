@@ -22,6 +22,7 @@
             <a class="dropdown-item" href="${ctx}/emp/master/employees">社員マスタ</a>
             <a class="dropdown-item" href="${ctx}/emp/master/company-divs">会社区分マスタ</a>
             <a class="dropdown-item" href="${ctx}/emp/master/departments">部署マスタ</a>
+            <a class="dropdown-item" href="${ctx}/emp/master/consent-documents">同意事項マスタ</a>
             <a class="dropdown-item" href="${ctx}/emp/master/approval-routes">承認ルートマスタ</a>
           </div>
         </li>

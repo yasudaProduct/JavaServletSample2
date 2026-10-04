@@ -76,6 +76,34 @@
     apply();
   });
 
+  // AP03：同意事項の PDF をすべて開くと「同意事項に同意します」を選べる（開いた記録はサーバー側にも残り、同意時に確認する）
+  var consentDocs = document.querySelectorAll('.consent-doc');
+  var agreedBox = document.getElementById('agreed');
+  if (consentDocs.length > 0 && agreedBox) {
+    var refreshAgree = function () {
+      var all = Array.prototype.every.call(consentDocs, function (li) { return li.getAttribute('data-viewed') === '1'; });
+      agreedBox.disabled = !all;
+      var hint = document.getElementById('agreeHint');
+      if (hint) { hint.hidden = all; }
+      if (!all) {
+        agreedBox.checked = false;
+        var btn = document.getElementById('agreeBtn');
+        if (btn) { btn.disabled = true; }
+      }
+    };
+    consentDocs.forEach(function (li) {
+      var link = li.querySelector('.doc-open');
+      if (!link) { return; }
+      link.addEventListener('click', function () {
+        li.setAttribute('data-viewed', '1');
+        var badge = li.querySelector('.doc-viewed');
+        if (badge) { badge.hidden = false; }
+        refreshAgree();
+      });
+    });
+    refreshAgree();
+  }
+
   // SC04：会社B の追加項目は、担当会社が対象（data-company-extra="1"）のときだけ表示して送信する
   var extraBox = document.getElementById('companyExtra');
   var extraCompany = document.getElementById('companyDiv');

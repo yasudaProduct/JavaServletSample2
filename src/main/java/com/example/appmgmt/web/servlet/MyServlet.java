@@ -25,12 +25,18 @@ import javax.servlet.http.HttpSession;
 
 /**
  * 申込者ポータル（/my/*）。
- * AP06 ログイン、AP07 メニュー（お知らせ／メニューのタブ）、AP08 申込確認、AP01〜AP03 相当の内容確認・同意（ログイン済みの申込者本人として）、AP09 パスワード変更。
+ * AP06 ログイン、AP07 メニュー（お知らせ／メニューのタブ）、AP08 申込確認、AP01〜AP03 相当の内容確認・同意（ログイン済みの申込者本人として）、AP09 パスワード変更、
+ * AP10 申込内容（PDF）。
  */
 public class MyServlet extends BaseServlet {
 
     @Override
     protected String fallbackPath(HttpServletRequest req) {
+        // 内容確認・同意（/my/applications/{id}/consent/...）の業務エラー（同意事項の未確認など）は同意の画面へ戻す
+        List<String> parts = pathParts(req);
+        if (parts.size() >= 3 && "applications".equals(parts.get(0)) && "consent".equals(parts.get(2)) && parseId(parts.get(1)) != null) {
+            return "/my/applications/" + parts.get(1) + "/consent";
+        }
         return "/my/menu";
     }
 
@@ -172,6 +178,9 @@ public class MyServlet extends BaseServlet {
             consent.disabled("現在、お手続きはありません。手続きが必要になるとお知らせが届きます。");
         }
         tiles.add(consent);
+        MenuTile docs = new MenuTile("documents", "申込内容（PDF）", "ご同意時と審査完了時のお申込内容、ご同意いただいた同意事項を PDF で確認します。");
+        docs.link(base + "/documents").style("outline-primary");
+        tiles.add(docs);
         tiles.add(new MenuTile("notice", "お知らせ", "確認依頼やアカウントのご案内など、お届けしたお知らせを表示します。").link("/my/menu?app=" + app.getApplicationId() + "&tab=notice").style("outline-secondary"));
         tiles.add(new MenuTile("password", "パスワード変更", "ログインパスワードを変更します。初期パスワードのままの場合は変更してください。").link("/my/password").style("outline-secondary"));
         return tiles;
@@ -192,11 +201,26 @@ public class MyServlet extends BaseServlet {
             render(req, res, "my/application.jsp");
             return;
         }
+        if ("documents".equals(sub)) {
+            documents(req, res, a, id, parts);
+            return;
+        }
         if (!"consent".equals(sub)) {
             res.sendError(404);
             return;
         }
         ConsentService cs = services().getConsentService();
+        if ("terms".equals(sub2)) {
+            // AP03 の同意事項 PDF（/my/applications/{id}/consent/terms/{文書コード}/{版番号}）。開いたことを記録する
+            Long ver = parts.size() > 5 ? parseId(parts.get(5)) : null;
+            if (ver == null) {
+                res.sendError(404);
+                return;
+            }
+            com.example.appmgmt.domain.ConsentDocumentVersion d = cs.openDocument(cs.byApplicant(a.getApplicantId(), id), parts.get(4), ver.intValue());
+            sendPdf(res, d.getData(), d.getFileName());
+            return;
+        }
         ConsentView v = cs.resolve(cs.byApplicant(a.getApplicantId(), id));
         String base = "/my/applications/" + id + "/consent";
         req.setAttribute("v", v);
@@ -227,6 +251,39 @@ public class MyServlet extends BaseServlet {
                 flash(req, "info", "現在、お手続きはありません。");
                 redirect(req, res, "/my/menu?app=" + id);
         }
+    }
+
+    /**
+     * AP10 申込内容（PDF）：同意時・審査完了時の申込内容 PDF と、同意した同意事項の一覧（/my/applications/{id}/documents）。
+     * /documents/pdf/{PDF ID} で申込内容 PDF、/documents/terms/{文書コード}/{版番号} で同意した版の同意事項を開く。
+     */
+    private void documents(HttpServletRequest req, HttpServletResponse res, ApplicantUser a, long id, List<String> parts) throws ServletException, IOException {
+        ApplicationDetail d = services().getApplicationQueryService().detailForApplicant(id, a.getApplicantId());
+        String kind = parts.size() > 3 ? parts.get(3) : "";
+        if ("pdf".equals(kind)) {
+            Long pdfId = parts.size() > 4 ? parseId(parts.get(4)) : null;
+            com.example.appmgmt.domain.ApplicationPdf p = pdfId == null ? null : services().getApplicationPdfService().get(id, pdfId).orElse(null);
+            if (p == null) {
+                res.sendError(404);
+                return;
+            }
+            sendPdf(res, p.getData(), p.getFileName());
+            return;
+        }
+        if ("terms".equals(kind)) {
+            Long ver = parts.size() > 5 ? parseId(parts.get(5)) : null;
+            if (ver == null) {
+                res.sendError(404);
+                return;
+            }
+            com.example.appmgmt.domain.ConsentDocumentVersion v = services().getConsentDocumentService().openAgreed(id, parts.get(4), ver.intValue());
+            sendPdf(res, v.getData(), v.getFileName());
+            return;
+        }
+        req.setAttribute("d", d);
+        req.setAttribute("pdfs", services().getApplicationPdfService().list(d.getApplication()));
+        req.setAttribute("agreedDocs", services().getConsentDocumentService().agreedFor(id));
+        render(req, res, "my/documents.jsp");
     }
 
     private void postConsent(HttpServletRequest req, HttpServletResponse res, ApplicantUser a, List<String> parts) throws ServletException, IOException {

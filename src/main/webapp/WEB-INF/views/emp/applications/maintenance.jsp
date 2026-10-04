@@ -40,5 +40,38 @@
     </c:forEach>
   </div>
 </div>
+<div class="row">
+  <div class="col-lg-7">
+    <h3 class="h6 section-title">申込内容 PDF（申込者のメニューと同じ）</h3>
+    <c:if test="${empty pdfs}"><p class="text-muted small">まだありません（申込者の同意時と審査完了時に作成します）。</p></c:if>
+    <c:if test="${not empty pdfs}">
+      <table class="table table-sm table-bordered" id="pdfTable">
+        <thead class="thead-light"><tr><th>手続き</th><th>種類</th><th>版</th><th>作成日時</th><th>状態</th><th>SHA-256</th><th></th></tr></thead>
+        <tbody>
+          <c:forEach var="p" items="${pdfs}">
+            <tr><td><c:out value="${p.phaseLabel}"/></td><td><c:out value="${p.pdfTypeName}"/></td><td>第 ${p.versionNo} 版</td><td class="small">${app:datetime(p.createdAt)}</td>
+              <td><span class="badge badge-${p.current ? 'success' : 'secondary'}"><c:out value="${p.stateLabel}"/></span></td><td class="small text-monospace" title="${p.fileHash}">${fn:substring(p.fileHash, 0, 12)}…</td>
+              <td><a class="btn btn-outline-primary btn-sm" href="${ctx}/emp/applications/${a.applicationId}/pdf/${p.pdfId}" target="_blank" rel="noopener">開く</a></td></tr>
+          </c:forEach>
+        </tbody>
+      </table>
+    </c:if>
+  </div>
+  <div class="col-lg-5">
+    <h3 class="h6 section-title">申込者が同意した同意事項</h3>
+    <c:if test="${empty agreedDocs}"><p class="text-muted small">まだありません。</p></c:if>
+    <c:if test="${not empty agreedDocs}">
+      <table class="table table-sm table-bordered" id="agreedDocTable">
+        <thead class="thead-light"><tr><th>同意日時</th><th>同意事項</th><th>版</th><th>開いた日時</th><th></th></tr></thead>
+        <tbody>
+          <c:forEach var="r" items="${agreedDocs}">
+            <tr><td class="small">${app:datetime(r.agreedAt)}<br><span class="text-muted"><c:out value="${r.consentTypeName}"/>・申込内容 第 ${r.contentVersionNo} 版</span></td><td><c:out value="${r.documentName}"/></td><td>第 ${r.versionNo} 版</td><td class="small">${app:datetime(r.viewedAt)}</td>
+              <td><a class="btn btn-outline-secondary btn-sm" href="${ctx}/emp/applications/${a.applicationId}/terms/${r.documentCd}/${r.versionNo}" target="_blank" rel="noopener">開く</a></td></tr>
+          </c:forEach>
+        </tbody>
+      </table>
+    </c:if>
+  </div>
+</div>
 <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">メニューへ戻る</a>
 <%@ include file="/WEB-INF/views/common/emp_bottom.jspf" %>

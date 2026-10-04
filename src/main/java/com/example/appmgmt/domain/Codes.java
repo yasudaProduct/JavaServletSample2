@@ -98,6 +98,15 @@ public final class Codes {
     public static final String CONSENT_RETURNED = "3";
     public static final String CONSENT_INVALID = "9";
 
+    // 同意事項の対象（M_CONSENT_DOCUMENT.TARGET_TYPE）。申込者同意の同意種別と同じ値 + 共通
+    public static final String DOC_TARGET_NEW = "1";
+    public static final String DOC_TARGET_CHANGE = "2";
+    public static final String DOC_TARGET_COMMON = "9";
+
+    // 申込内容 PDF の種別（T_APPLICATION_PDF.PDF_TYPE）
+    public static final String PDF_CONSENTED = "1";
+    public static final String PDF_REVIEWED = "2";
+
     // 連携種別
     public static final String LINK_PRECHECK = "1";
     public static final String LINK_REVIEW = "2";
@@ -146,6 +155,8 @@ public final class Codes {
         put("REGISTRATION_TYPE", "1", "一括取込", "2", "画面入力", "3", "追加申込");
         put("CONSENT_TYPE", "1", "新規申込", "2", "契約変更");
         put("CONSENT_STATUS", "1", "確認依頼中", "2", "同意済", "3", "申込者差戻し", "9", "無効");
+        put("DOC_TARGET", "1", "新規申込", "2", "契約変更", "9", "共通");
+        put("PDF_TYPE", "1", "ご同意時", "2", "審査完了時");
         put("LINK_TYPE", "1", "事前確認依頼", "2", "審査依頼", "3", "契約変更事前確認依頼", "4", "契約変更審査依頼");
         put("SEND_STATUS", "0", "未送信", "1", "送信済", "2", "送信エラー");
         put("EXT_RESULT", "1", "問題なし", "2", "修正必要", "3", "審査完了", "4", "審査差戻し");

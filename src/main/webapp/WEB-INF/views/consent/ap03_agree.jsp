@@ -4,18 +4,33 @@
 <c:set var="cur" value="${v.version}"/><c:set var="base" value="${v.contractChange ? v.beforeVersion : null}"/><c:set var="curLabel" value="${v.contractChange ? '変更後' : '確定したお申込内容'}"/><c:set var="baseLabel" value="変更前"/>
 <c:set var="applicantView" value="${true}"/>
 <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
-<div class="card mb-3"><div class="card-body small">
-  <strong>同意事項（サンプル文言）</strong><br>
-  <c:choose>
-    <c:when test="${v.contractChange}">上記の契約変更内容に相違がないことを確認し、変更後の内容で契約を継続することに同意します。審査担当部門の審査結果によっては変更をお受けできない場合があります。</c:when>
-    <c:otherwise>上記のお申込内容に相違がないことを確認し、お申込に同意します。審査担当部門の審査結果によってはお申込をお受けできない場合があります。</c:otherwise>
-  </c:choose>
-</div></div>
+<%-- 同意事項（PDF）。適用中の版をすべて開くと「同意事項に同意します」を選べる。開いた版はサーバーで記録し、同意時にも確認する --%>
+<div class="card mb-3" id="consentDocs">
+  <div class="card-header py-2">同意事項（PDF）</div>
+  <div class="card-body py-2">
+    <c:choose>
+      <c:when test="${empty v.documents}"><p class="small text-muted mb-0">確認が必要な同意事項はありません。</p></c:when>
+      <c:otherwise>
+        <p class="small mb-2">次の同意事項をすべて開いて内容をご確認ください。すべて確認すると「同意する」を押せるようになります。</p>
+        <ul class="list-group">
+          <c:forEach var="doc" items="${v.documents}">
+            <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center py-2 consent-doc" data-doc="${doc.documentCd}" data-viewed="${doc.viewed ? '1' : '0'}">
+              <span><c:out value="${doc.documentName}"/> <small class="text-muted">第 ${doc.currentVersion.versionNo} 版（${app:datetime(doc.currentVersion.effectiveFrom)} 適用）</small></span>
+              <span class="text-nowrap"><span class="badge badge-success doc-viewed" ${doc.viewed ? '' : 'hidden'}>確認済み</span>
+                <a class="btn btn-outline-primary btn-sm ml-2 doc-open" href="${ctx}${consentBase}/terms/${doc.documentCd}/${doc.currentVersion.versionNo}" target="_blank" rel="noopener">PDF を開く</a></span>
+            </li>
+          </c:forEach>
+        </ul>
+      </c:otherwise>
+    </c:choose>
+  </div>
+</div>
 <form method="post" action="${ctx}${consentBase}/agree">
   <input type="hidden" name="_csrf" value="${csrf}">
   <div class="custom-control custom-checkbox mb-3">
-    <input type="checkbox" class="custom-control-input" id="agreed" name="agreed" value="1" onchange="document.getElementById('agreeBtn').disabled = !this.checked;">
-    <label class="custom-control-label" for="agreed">同意事項に同意します</label>
+    <input type="checkbox" class="custom-control-input" id="agreed" name="agreed" value="1" ${v.allDocumentsViewed ? '' : 'disabled'} onchange="document.getElementById('agreeBtn').disabled = !this.checked;">
+    <label class="custom-control-label" for="agreed">上記の内容を確認し、同意事項に同意します</label>
+    <small class="form-text text-muted" id="agreeHint" ${v.allDocumentsViewed ? 'hidden' : ''}>同意事項の PDF をすべて開くと選べるようになります。</small>
   </div>
   <button type="submit" name="action" value="agree" class="btn btn-primary mr-2" id="agreeBtn" disabled>同意する</button>
   <c:if test="${not v.contractChange}"><button type="submit" name="action" value="modify" class="btn btn-outline-secondary mr-2">修正</button></c:if>

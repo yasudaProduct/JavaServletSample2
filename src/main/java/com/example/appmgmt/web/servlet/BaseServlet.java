@@ -194,6 +194,19 @@ public abstract class BaseServlet extends HttpServlet {
         return req.getRemoteAddr();
     }
 
+    /** PDF をブラウザで表示する（inline）。保存されたファイルをそのまま返し、キャッシュさせない。 */
+    protected void sendPdf(HttpServletResponse res, byte[] data, String fileName) throws IOException {
+        // フィルターで設定した文字コード（UTF-8）を外して、Content-Type を application/pdf だけにする
+        res.setCharacterEncoding(null);
+        res.setContentType("application/pdf");
+        res.setContentLength(data.length);
+        String encoded = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+        res.setHeader("Content-Disposition", "inline; filename=\"document.pdf\"; filename*=UTF-8''" + encoded);
+        res.setHeader("Cache-Control", "no-store");
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.getOutputStream().write(data);
+    }
+
     /** 業務エラー時の戻り先（既定は申込一覧）。 */
     protected String fallbackPath(HttpServletRequest req) {
         return "/emp/applications";

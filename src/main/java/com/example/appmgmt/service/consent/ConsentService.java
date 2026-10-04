@@ -16,7 +16,9 @@ import com.example.appmgmt.domain.ApplicantConsent;
 import com.example.appmgmt.domain.Application;
 import com.example.appmgmt.domain.ApplicationVersion;
 import com.example.appmgmt.domain.Codes;
+import com.example.appmgmt.domain.ConsentDocumentVersion;
 import com.example.appmgmt.domain.StatusCd;
+import com.example.appmgmt.service.document.ConsentDocumentService;
 import com.example.appmgmt.service.transition.StatusTransitionService;
 import com.example.appmgmt.service.transition.TransitionRequest;
 import com.example.appmgmt.service.transition.TransitionResult;
@@ -42,15 +44,17 @@ public class ConsentService {
     private final ApplicantAccountDao accountDao;
     private final StatusDao statusDao;
     private final StatusTransitionService transitionService;
+    private final ConsentDocumentService documentService;
 
     public ConsentService(ApplicantConsentDao consentDao, ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantAccountDao accountDao, StatusDao statusDao,
-                          StatusTransitionService transitionService) {
+                          StatusTransitionService transitionService, ConsentDocumentService documentService) {
         this.consentDao = consentDao;
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
         this.accountDao = accountDao;
         this.statusDao = statusDao;
         this.transitionService = transitionService;
+        this.documentService = documentService;
     }
 
     /** 確認用 URL のトークンで解決する（F07 8.3 トークン検証）。 */
@@ -129,6 +133,7 @@ public class ConsentService {
             v.setOutcome(ConsentView.Outcome.CONFIRM);
         } else if (StatusCd.AGREE_WAIT.contains(app.getStatusCd())) {
             v.setOutcome(ConsentView.Outcome.AGREE);
+            v.setDocuments(documentService.forConsent(conn, c));
         } else {
             v.setOutcome(ConsentView.Outcome.COMPLETED);
         }
@@ -187,7 +192,20 @@ public class ConsentService {
             if (!StatusCd.AGREE_WAIT.contains(v.getApplication().getStatusCd())) {
                 throw new TransitionNotAllowedException();
             }
+            // 同意事項：適用中の全文書の版を開いていること（E118／改定後は E119）。開いた版を同意済みにする
+            documentService.agree(conn, v.getConsent(), LocalDateTime.now().withNano(0));
             return transitionService.transition(conn, request(v, Codes.ACTION_CONSENT, ip));
+        });
+    }
+
+    /** AP03 で同意事項の PDF を開く（同意確認待ちの間だけ）。閲覧を記録する。 */
+    public ConsentDocumentVersion openDocument(Resolver r, String documentCd, int versionNo) {
+        return Tx.execute(conn -> {
+            ConsentView v = requireActive(conn, r);
+            if (!StatusCd.AGREE_WAIT.contains(v.getApplication().getStatusCd())) {
+                throw new TransitionNotAllowedException();
+            }
+            return documentService.open(conn, v.getConsent(), documentCd, versionNo);
         });
     }
 

@@ -24,6 +24,7 @@ import com.example.appmgmt.domain.StatusHistory;
 import com.example.appmgmt.domain.StatusTransition;
 import com.example.appmgmt.service.auth.ApplicantAuthService;
 import com.example.appmgmt.service.consent.ConsentIssuer;
+import com.example.appmgmt.service.document.ApplicationPdfService;
 import com.example.appmgmt.service.notification.NotificationService;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -51,6 +52,8 @@ public class StatusTransitionService {
     private final NotificationService notificationService;
     private final ConsentIssuer consentIssuer;
     private final ApplicantAuthService applicantAuthService;
+    /** 申込内容 PDF（同意時・審査完了時）の作成。未設定（単体テスト）なら作らない。 */
+    private ApplicationPdfService pdfService;
 
     public StatusTransitionService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, CompanyDivDao companyDivDao, StatusTransitionDao transitionDao,
                                    StatusHistoryDao historyDao, ApprovalRequestDao approvalRequestDao, ApplicantConsentDao consentDao, ExternalLinkDao externalLinkDao,
@@ -66,6 +69,10 @@ public class StatusTransitionService {
         this.notificationService = notificationService;
         this.consentIssuer = consentIssuer;
         this.applicantAuthService = applicantAuthService;
+    }
+
+    public void setApplicationPdfService(ApplicationPdfService pdfService) {
+        this.pdfService = pdfService;
     }
 
     public TransitionResult transition(Connection conn, TransitionRequest req) {
@@ -264,6 +271,10 @@ public class StatusTransitionService {
                 if (StatusCd.PRECHECK_RESULT_ACCEPTABLE.contains(t.getToStatusCd())) {
                     externalLinkDao.insert(conn, app.getApplicationId(), app.getCurrentVersionNo(), change ? Codes.LINK_CHANGE_PRECHECK : Codes.LINK_PRECHECK);
                 }
+                // 同意時の申込内容 PDF（同意した版と同意事項の版）
+                if (pdfService != null) {
+                    pdfService.createConsentPdf(conn, app, req.getConsentId(), now);
+                }
                 break;
             }
             case 19: case 47: case 32:
@@ -278,14 +289,19 @@ public class StatusTransitionService {
                 // 審査申請：審査依頼
                 externalLinkDao.insert(conn, app.getApplicationId(), app.getCurrentVersionNo(), change ? Codes.LINK_CHANGE_REVIEW : Codes.LINK_REVIEW);
                 break;
-            case 27: case 52:
-                // 審査完了：審査完了版・審査完了日時、確定版化、審査結果通知
+            case 27: case 52: {
+                // 審査完了：審査完了版・審査完了日時、確定版化、審査結果通知、審査完了時の申込内容 PDF
+                Integer previousReviewed = app.getReviewedVersionNo();
                 app.setReviewedVersionNo(app.getCurrentVersionNo());
                 app.setReviewedAt(now);
                 applicationDao.updateVersions(conn, app);
                 versionDao.updateFixed(conn, app.getApplicationId(), app.getCurrentVersionNo());
                 notificationService.registerReviewCompleted(conn, app);
+                if (pdfService != null) {
+                    pdfService.createReviewedPdf(conn, app, previousReviewed, now);
+                }
                 break;
+            }
             case 28:
                 // 審査差戻し（新規申込）
                 notificationService.registerReviewReturned(conn, app, req.getComment(), false);

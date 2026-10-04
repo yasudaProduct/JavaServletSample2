@@ -21,8 +21,13 @@ public final class TokenUtil {
     }
 
     public static String sha256Hex(String value) {
+        return sha256Hex(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** バイト列（PDF ファイルなど）の SHA-256（16 進 64 文字）。 */
+    public static String sha256Hex(byte[] value) {
         try {
-            byte[] d = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            byte[] d = MessageDigest.getInstance("SHA-256").digest(value);
             StringBuilder sb = new StringBuilder(64);
             for (byte x : d) {
                 sb.append(String.format("%02x", x));
