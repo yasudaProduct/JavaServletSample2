@@ -25,7 +25,7 @@
         <div class="form-group col-md-3 mb-2">
           <label for="companyDiv">会社 <span class="badge badge-danger">必須</span></label>
           <select class="form-control ${not empty errors.companyDiv ? 'is-invalid' : ''}" id="companyDiv" name="companyDiv">
-            <c:forEach var="c" items="${assign.companies}"><option value="${c.companyDiv}" ${form.companyDiv == c.companyDiv ? 'selected' : ''}><c:out value="${c.companyDivName}"/></option></c:forEach>
+            <c:forEach var="c" items="${assign.companies}"><option value="${c.companyDiv}" data-company-extra="${c.companyExtraTarget ? '1' : '0'}" ${form.companyDiv == c.companyDiv ? 'selected' : ''}><c:out value="${c.companyDivName}"/></option></c:forEach>
           </select>
           <div class="invalid-feedback"><c:out value="${errors.companyDiv}"/></div>
         </div>
@@ -64,6 +64,7 @@
       </c:choose>
     </div>
   </div>
+  <c:set var="companyExtra" value="toggle"/>
   <%@ include file="/WEB-INF/views/common/version_fields.jspf" %>
   <div class="mt-3">
     <button type="submit" name="action" value="save" class="btn btn-outline-primary mr-2">一時保存</button>

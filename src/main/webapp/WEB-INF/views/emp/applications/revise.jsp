@@ -21,6 +21,7 @@
 <form method="post" action="${ctx}/emp/applications/${a.applicationId}/revise">
   <input type="hidden" name="_csrf" value="${csrf}">
   <input type="hidden" name="rowVersion" value="${a.rowVersion}">
+  <c:set var="companyExtra" value="${d.application.companyExtraTarget ? 'fixed' : ''}"/>
   <%@ include file="/WEB-INF/views/common/version_fields.jspf" %>
   <button type="submit" class="btn btn-primary mr-2">確定</button>
   <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">戻る</a>

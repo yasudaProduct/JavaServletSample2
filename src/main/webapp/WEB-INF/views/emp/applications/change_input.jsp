@@ -13,6 +13,7 @@
 <form method="post" action="${ctx}/emp/applications/${a.applicationId}/change">
   <input type="hidden" name="_csrf" value="${csrf}">
   <input type="hidden" name="rowVersion" value="${a.rowVersion}">
+  <c:set var="companyExtra" value="${d.application.companyExtraTarget ? 'fixed' : ''}"/>
   <%@ include file="/WEB-INF/views/common/version_fields.jspf" %>
   <button type="submit" name="action" value="save" class="btn btn-outline-primary mr-2">一時保存</button>
   <button type="submit" name="action" value="confirm" class="btn btn-primary mr-2">確認へ</button>

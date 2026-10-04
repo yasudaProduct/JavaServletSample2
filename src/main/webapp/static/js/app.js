@@ -76,6 +76,20 @@
     apply();
   });
 
+  // SC04：会社B の追加項目は、担当会社が対象（data-company-extra="1"）のときだけ表示して送信する
+  var extraBox = document.getElementById('companyExtra');
+  var extraCompany = document.getElementById('companyDiv');
+  if (extraBox && extraCompany && extraCompany.tagName === 'SELECT') {
+    var applyExtra = function () {
+      var opt = extraCompany.options[extraCompany.selectedIndex];
+      var on = !!opt && opt.getAttribute('data-company-extra') === '1';
+      extraBox.hidden = !on;
+      extraBox.querySelectorAll('input, textarea').forEach(function (el) { el.disabled = !on; });
+    };
+    extraCompany.addEventListener('change', applyExtra);
+    applyExtra();
+  }
+
   // SC04：担当者を自分以外にする保存は確認する（保存後は担当者だけが操作できる）
   var assignOwner = document.getElementById('ownerEmployeeId');
   if (assignOwner && assignOwner.form && assignOwner.form.hasAttribute('data-user-id')) {

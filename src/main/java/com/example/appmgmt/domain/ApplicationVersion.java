@@ -28,6 +28,10 @@ public class ApplicationVersion extends AuditedEntity {
     private LocalDateTime confirmedAt;
     private String fixedFlg;
     private String canceledFlg;
+    /** 会社B（会社区分 2）だけの追加項目。入力するだけで制御には使わない。会社区分 2 以外の版では空。 */
+    private String corporateNo;
+    private String installPlace;
+    private String contactMemo;
     /** 担当（申込受付会社側の会社区分・部署・担当社員）。申込（T_APPLICATION）の値と同じものを版にも記録する。入力中だけ変更できる。 */
     private String companyDiv;
     private String deptCd;
@@ -98,6 +102,14 @@ public class ApplicationVersion extends AuditedEntity {
     public void setFixedFlg(String fixedFlg) { this.fixedFlg = fixedFlg; }
     public String getCanceledFlg() { return canceledFlg; }
     public void setCanceledFlg(String canceledFlg) { this.canceledFlg = canceledFlg; }
+    public String getCorporateNo() { return corporateNo; }
+    public void setCorporateNo(String corporateNo) { this.corporateNo = corporateNo; }
+    public String getInstallPlace() { return installPlace; }
+    public void setInstallPlace(String installPlace) { this.installPlace = installPlace; }
+    public String getContactMemo() { return contactMemo; }
+    public void setContactMemo(String contactMemo) { this.contactMemo = contactMemo; }
+    /** この版の担当会社が会社B の追加項目の対象か。 */
+    public boolean isCompanyExtraTarget() { return Codes.hasCompanyExtra(companyDiv); }
     public boolean isFixed() { return Codes.FLG_ON.equals(fixedFlg); }
     public boolean isCanceled() { return Codes.FLG_ON.equals(canceledFlg); }
     public String getVersionTypeName() { return Codes.label("VERSION_TYPE", versionType); }
@@ -120,7 +132,16 @@ public class ApplicationVersion extends AuditedEntity {
                 && cmp(handlingFee, other.handlingFee)
                 && Objects.equals(contractStartDate, other.contractStartDate)
                 && Objects.equals(contractEndDate, other.contractEndDate)
-                && Objects.equals(normalize(remarks), normalize(other.remarks));
+                && Objects.equals(normalize(remarks), normalize(other.remarks))
+                && sameCompanyExtraAs(other);
+    }
+
+    /** 会社B の追加項目が同じか。 */
+    public boolean sameCompanyExtraAs(ApplicationVersion other) {
+        return other != null
+                && Objects.equals(normalize(corporateNo), normalize(other.corporateNo))
+                && Objects.equals(normalize(installPlace), normalize(other.installPlace))
+                && Objects.equals(normalize(contactMemo), normalize(other.contactMemo));
     }
 
     /** 申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）が同じか。 */
@@ -149,7 +170,18 @@ public class ApplicationVersion extends AuditedEntity {
         return s == null || s.isEmpty() ? null : s.replace("\r\n", "\n");
     }
 
-    /** 入力された申込内容（申込者情報を含む）をこの版へ写す。版番号・版種別・確定状態などは変えない。 */
+    /**
+     * 会社B の追加項目を写す。担当会社が会社区分 2 でなければ空にする。社員の入力（SC04／SC07／SC08）だけで使い、
+     * 申込者の修正（AP02）では呼ばない（申込者は追加項目を変更できない）。
+     */
+    public void applyCompanyExtraFrom(ApplicationVersion content, String companyDiv) {
+        boolean target = Codes.hasCompanyExtra(companyDiv);
+        corporateNo = target ? content.corporateNo : null;
+        installPlace = target ? content.installPlace : null;
+        contactMemo = target ? content.contactMemo : null;
+    }
+
+    /** 入力された申込内容（申込者情報を含む）をこの版へ写す。会社B の追加項目は写さない（applyCompanyExtraFrom）。版番号・版種別・確定状態などは変えない。 */
     public void applyContentFrom(ApplicationVersion content) {
         applicantName = content.applicantName;
         applicantKana = content.applicantKana;
@@ -181,6 +213,9 @@ public class ApplicationVersion extends AuditedEntity {
         v.contractStartDate = contractStartDate;
         v.contractEndDate = contractEndDate;
         v.remarks = remarks;
+        v.corporateNo = corporateNo;
+        v.installPlace = installPlace;
+        v.contactMemo = contactMemo;
         v.companyDiv = companyDiv;
         v.deptCd = deptCd;
         v.ownerEmployeeId = ownerEmployeeId;

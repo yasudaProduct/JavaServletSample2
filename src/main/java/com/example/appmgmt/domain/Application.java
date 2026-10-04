@@ -29,6 +29,8 @@ public class Application extends AuditedEntity {
     public void setOwnerEmployeeId(long ownerEmployeeId) { this.ownerEmployeeId = ownerEmployeeId; }
     public String getCompanyDiv() { return companyDiv; }
     public void setCompanyDiv(String companyDiv) { this.companyDiv = companyDiv; }
+    /** 会社B の追加項目を入力する申込か（担当会社が会社区分 2）。 */
+    public boolean isCompanyExtraTarget() { return Codes.hasCompanyExtra(companyDiv); }
     public String getDeptCd() { return deptCd; }
     public void setDeptCd(String deptCd) { this.deptCd = deptCd; }
     public String getStatusCd() { return statusCd; }

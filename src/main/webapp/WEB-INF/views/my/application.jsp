@@ -6,6 +6,7 @@
 <c:set var="cur" value="${d.currentVersion}"/>
 <c:set var="base" value="${not empty d.reviewedVersion and d.reviewedVersion.versionNo != cur.versionNo ? d.reviewedVersion : null}"/>
 <c:set var="curLabel" value="${empty base ? 'お申込内容' : '変更後'}"/><c:set var="baseLabel" value="変更前"/>
+<c:set var="applicantView" value="${true}"/>
 <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
 <c:if test="${not empty cv.consent}">
   <div class="card mb-3"><div class="card-body py-2 small">

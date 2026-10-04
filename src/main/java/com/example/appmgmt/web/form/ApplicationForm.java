@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletRequest;
  * 申込内容の入力フォーム（SC04／SC07／SC08／AP02 共通）。入力値は文字列で保持し、チェック後に版へ変換する。
  * 申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）も申込データとしてここで扱う。
  * 担当（会社区分・部署・担当社員）は SC04 の入力中だけ扱う（存在・組合せの検証はサービス層）。
+ * 会社B の追加項目（法人番号・設置場所・窓口メモ）は会社B の申込の画面だけが送る（会社区分による保存の可否はサービス層）。
  */
 public class ApplicationForm {
     private String companyDiv = "";
@@ -28,6 +29,9 @@ public class ApplicationForm {
     private String contractStartDate = "";
     private String contractEndDate = "";
     private String remarks = "";
+    private String corporateNo = "";
+    private String installPlace = "";
+    private String contactMemo = "";
 
     public static ApplicationForm bind(HttpServletRequest req) {
         ApplicationForm f = new ApplicationForm();
@@ -46,6 +50,9 @@ public class ApplicationForm {
         f.contractStartDate = p(req, "contractStartDate");
         f.contractEndDate = p(req, "contractEndDate");
         f.remarks = req.getParameter("remarks") == null ? "" : req.getParameter("remarks").replace("\r\n", "\n").strip();
+        f.corporateNo = p(req, "corporateNo");
+        f.installPlace = p(req, "installPlace");
+        f.contactMemo = req.getParameter("contactMemo") == null ? "" : req.getParameter("contactMemo").replace("\r\n", "\n").strip();
         return f;
     }
 
@@ -78,6 +85,9 @@ public class ApplicationForm {
         f.contractStartDate = Formats.date(v.getContractStartDate());
         f.contractEndDate = Formats.date(v.getContractEndDate());
         f.remarks = n(v.getRemarks());
+        f.corporateNo = n(v.getCorporateNo());
+        f.installPlace = n(v.getInstallPlace());
+        f.contactMemo = n(v.getContactMemo());
         return f;
     }
 
@@ -139,6 +149,7 @@ public class ApplicationForm {
             } else if (Validation.hasControlChars(remarks)) {
                 v.reject("remarks", "E003", "備考");
             }
+            validateCompanyExtra(v);
         }
         if (full && !v.has("basicFee") && !v.has("optionFee") && !v.has("handlingFee")) {
             BigDecimal total = total();
@@ -147,6 +158,23 @@ public class ApplicationForm {
             }
         }
         return v;
+    }
+
+    /** 会社B の追加項目のチェック（いずれも任意。入力があれば桁・書式を確認する）。 */
+    private void validateCompanyExtra(Validation v) {
+        if (!corporateNo.isEmpty() && !corporateNo.matches("[0-9]{13}")) {
+            v.reject("corporateNo", "E003", "法人番号");
+        }
+        if (installPlace.length() > 200) {
+            v.reject("installPlace", "E002", "設置場所", 200);
+        } else if (Validation.hasControlChars(installPlace)) {
+            v.reject("installPlace", "E003", "設置場所");
+        }
+        if (contactMemo.length() > 500) {
+            v.reject("contactMemo", "E002", "窓口メモ", 500);
+        } else if (Validation.hasControlChars(contactMemo)) {
+            v.reject("contactMemo", "E003", "窓口メモ");
+        }
     }
 
     /** 申込者情報のチェック。申込者名・メールアドレスは確認へ・確定で必須（一時保存は桁・書式のみ）。 */
@@ -243,6 +271,9 @@ public class ApplicationForm {
         v.setContractStartDate(Formats.parseDate(contractStartDate));
         v.setContractEndDate(Formats.parseDate(contractEndDate));
         v.setRemarks(nullIfEmpty(remarks));
+        v.setCorporateNo(nullIfEmpty(corporateNo));
+        v.setInstallPlace(nullIfEmpty(installPlace));
+        v.setContactMemo(nullIfEmpty(contactMemo));
         v.recalcTotal();
         return v;
     }
@@ -262,5 +293,10 @@ public class ApplicationForm {
     public String getContractStartDate() { return contractStartDate; }
     public String getContractEndDate() { return contractEndDate; }
     public String getRemarks() { return remarks; }
+    public String getCorporateNo() { return corporateNo; }
+    public String getInstallPlace() { return installPlace; }
+    public String getContactMemo() { return contactMemo; }
+    /** 選択中の担当会社が会社B の追加項目の対象か（SC04 の初期表示）。 */
+    public boolean isCompanyExtraTarget() { return com.example.appmgmt.domain.Codes.hasCompanyExtra(companyDiv); }
     public String getTotalAmount() { BigDecimal t = total(); return t == null ? "" : Formats.amount(t); }
 }

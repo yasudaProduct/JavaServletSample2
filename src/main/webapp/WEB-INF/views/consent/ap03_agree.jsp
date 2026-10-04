@@ -2,6 +2,7 @@
 <%@ include file="/WEB-INF/views/common/ap_top.jspf" %>
 <p class="small text-muted">申込番号 <c:out value="${v.application.applicationNo}"/>　<c:out value="${v.applicant.applicantName}"/> 様　手続きの状況：<strong><c:out value="${v.applicantStatusName}"/></strong><c:if test="${not empty v.consent}">　確認期限：${app:datetime(v.consent.tokenExpiresAt)}</c:if></p>
 <c:set var="cur" value="${v.version}"/><c:set var="base" value="${v.contractChange ? v.beforeVersion : null}"/><c:set var="curLabel" value="${v.contractChange ? '変更後' : '確定したお申込内容'}"/><c:set var="baseLabel" value="変更前"/>
+<c:set var="applicantView" value="${true}"/>
 <%@ include file="/WEB-INF/views/common/version_view.jspf" %>
 <div class="card mb-3"><div class="card-body small">
   <strong>同意事項（サンプル文言）</strong><br>

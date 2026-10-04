@@ -1,4 +1,5 @@
-<%-- 申込内容（申込者情報を含む）の入力欄。form：ApplicationForm、errors：項目名→メッセージ、amountsOnly：金額項目だけ編集可、base：比較元の版（任意） --%>
+<%-- 申込内容（申込者情報を含む）の入力欄。form：ApplicationForm、errors：項目名→メッセージ、amountsOnly：金額項目だけ編集可、base：比較元の版（任意）、
+     companyExtra：会社B の追加項目欄（toggle = SC04。担当会社の選択で表示を切り替える、fixed = 会社B の申込の SC07／SC08、空 = 出さない（AP02 など）） --%>
 <c:set var="ro" value="${amountsOnly ? 'readonly' : ''}"/>
 <h3 class="h6 section-title mt-0">申込者情報</h3>
 <div class="form-row">
@@ -90,3 +91,30 @@
   <c:if test="${not empty base}"><small class="form-text text-muted pre-wrap">比較元：<c:out value="${app:text(base.remarks)}"/></small></c:if>
   <div class="invalid-feedback"><c:out value="${errors.remarks}"/></div>
 </div>
+<c:if test="${not empty companyExtra}">
+<c:set var="extraOn" value="${companyExtra == 'fixed' or form.companyExtraTarget}"/>
+<div id="companyExtra" ${extraOn ? '' : 'hidden'}>
+<h3 class="h6 section-title">会社B 追加項目</h3>
+<div class="form-row">
+  <div class="form-group col-md-4">
+    <label for="corporateNo">法人番号</label>
+    <input type="text" class="form-control ${not empty errors.corporateNo ? 'is-invalid' : ''}" id="corporateNo" name="corporateNo" maxlength="13" value="<c:out value='${form.corporateNo}'/>" placeholder="半角数字 13 桁" inputmode="numeric" ${ro} ${extraOn ? '' : 'disabled'}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：<c:out value="${app:text(base.corporateNo)}"/></small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.corporateNo}"/></div>
+  </div>
+  <div class="form-group col-md-8">
+    <label for="installPlace">設置場所</label>
+    <input type="text" class="form-control ${not empty errors.installPlace ? 'is-invalid' : ''}" id="installPlace" name="installPlace" maxlength="200" value="<c:out value='${form.installPlace}'/>" ${ro} ${extraOn ? '' : 'disabled'}>
+    <c:if test="${not empty base}"><small class="form-text text-muted">比較元：<c:out value="${app:text(base.installPlace)}"/></small></c:if>
+    <div class="invalid-feedback"><c:out value="${errors.installPlace}"/></div>
+  </div>
+</div>
+<div class="form-group">
+  <label for="contactMemo">窓口メモ</label>
+  <textarea class="form-control ${not empty errors.contactMemo ? 'is-invalid' : ''}" id="contactMemo" name="contactMemo" rows="2" maxlength="500" ${ro} ${extraOn ? '' : 'disabled'}><c:out value="${form.contactMemo}"/></textarea>
+  <c:if test="${not empty base}"><small class="form-text text-muted pre-wrap">比較元：<c:out value="${app:text(base.contactMemo)}"/></small></c:if>
+  <div class="invalid-feedback"><c:out value="${errors.contactMemo}"/></div>
+</div>
+<p class="small text-muted">担当会社が会社B の申込だけの項目です（いずれも任意）。入力内容による制御はありません。</p>
+</div>
+</c:if>

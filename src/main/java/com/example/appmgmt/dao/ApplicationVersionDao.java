@@ -14,6 +14,7 @@ public class ApplicationVersionDao extends AbstractDao {
     private static final String SELECT = "SELECT v.APPLICATION_ID, v.VERSION_NO, v.VERSION_TYPE, v.COPIED_FROM_VERSION_NO, v.APPLICANT_NAME, v.APPLICANT_KANA, v.TEL_NO, v.MAIL_ADDRESS, v.ADDRESS, "
             + "v.PRODUCT_CD, v.BASIC_FEE, v.OPTION_FEE, v.HANDLING_FEE, v.TOTAL_AMOUNT, v.CONTRACT_START_DATE, v.CONTRACT_END_DATE, "
             + "v.AMOUNT_RATIO, v.REMARKS, v.CONFIRMED_AT, v.FIXED_FLG, v.CANCELED_FLG, v.COMPANY_DIV, v.DEPT_CD, v.OWNER_EMPLOYEE_ID, "
+            + "v.CORPORATE_NO, v.INSTALL_PLACE, v.CONTACT_MEMO, "
             + "c.COMPANY_DIV_NAME, d.DEPT_NAME, e.EMPLOYEE_NAME AS OWNER_NAME, "
             + "v.CREATED_AT, v.CREATED_BY, v.UPDATED_AT, v.UPDATED_BY, v.ROW_VERSION FROM T_APPLICATION_VERSION v "
             + "LEFT JOIN M_COMPANY_DIV c ON c.COMPANY_DIV = v.COMPANY_DIV "
@@ -46,6 +47,9 @@ public class ApplicationVersionDao extends AbstractDao {
         v.setCompanyDiv(rs.getString("COMPANY_DIV"));
         v.setDeptCd(rs.getString("DEPT_CD"));
         v.setOwnerEmployeeId(longObj(rs, "OWNER_EMPLOYEE_ID"));
+        v.setCorporateNo(rs.getString("CORPORATE_NO"));
+        v.setInstallPlace(rs.getString("INSTALL_PLACE"));
+        v.setContactMemo(rs.getString("CONTACT_MEMO"));
         v.setCompanyDivName(rs.getString("COMPANY_DIV_NAME"));
         v.setDeptName(rs.getString("DEPT_NAME"));
         v.setOwnerName(rs.getString("OWNER_NAME"));
@@ -69,13 +73,13 @@ public class ApplicationVersionDao extends AbstractDao {
         v.recalcTotal();
         update(conn, "INSERT INTO T_APPLICATION_VERSION (APPLICATION_ID, VERSION_NO, VERSION_TYPE, COPIED_FROM_VERSION_NO, APPLICANT_NAME, APPLICANT_KANA, TEL_NO, MAIL_ADDRESS, ADDRESS, "
                 + "PRODUCT_CD, BASIC_FEE, OPTION_FEE, HANDLING_FEE, TOTAL_AMOUNT, CONTRACT_START_DATE, CONTRACT_END_DATE, "
-                + "AMOUNT_RATIO, REMARKS, CONFIRMED_AT, FIXED_FLG, CANCELED_FLG, COMPANY_DIV, DEPT_CD, OWNER_EMPLOYEE_ID, " + AUDIT_COLS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                + "AMOUNT_RATIO, REMARKS, CONFIRMED_AT, FIXED_FLG, CANCELED_FLG, COMPANY_DIV, DEPT_CD, OWNER_EMPLOYEE_ID, CORPORATE_NO, INSTALL_PLACE, CONTACT_MEMO, " + AUDIT_COLS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
                 v.getApplicationId(), v.getVersionNo(), v.getVersionType(), v.getCopiedFromVersionNo(),
                 v.getApplicantName(), v.getApplicantKana(), v.getTelNo(), v.getMailAddress(), v.getAddress(),
                 v.getProductCd(), v.getBasicFee(), v.getOptionFee(), v.getHandlingFee(), v.getTotalAmount(),
                 v.getContractStartDate(), v.getContractEndDate(), v.getAmountRatio(), v.getRemarks(), v.getConfirmedAt(),
                 v.getFixedFlg() == null ? Codes.FLG_OFF : v.getFixedFlg(), v.getCanceledFlg() == null ? Codes.FLG_OFF : v.getCanceledFlg(),
-                v.getCompanyDiv(), v.getDeptCd(), v.getOwnerEmployeeId(), now(), actor(), now(), actor());
+                v.getCompanyDiv(), v.getDeptCd(), v.getOwnerEmployeeId(), v.getCorporateNo(), v.getInstallPlace(), v.getContactMemo(), now(), actor(), now(), actor());
     }
 
     /** 版の担当（会社区分・部署・担当社員）の更新。申込入力（SC04）の保存で、申込の担当と一緒に更新する。 */
@@ -84,15 +88,15 @@ public class ApplicationVersionDao extends AbstractDao {
                 companyDiv, deptCd, ownerEmployeeId, now(), actor(), applicationId, versionNo);
     }
 
-    /** 申込内容（申込者情報・商品・金額・契約期間・備考・倍率・確定日時）の更新。 */
+    /** 申込内容（申込者情報・商品・金額・契約期間・備考・会社B の追加項目・倍率・確定日時）の更新。 */
     public void updateContent(Connection conn, ApplicationVersion v) {
         v.recalcTotal();
         update(conn, "UPDATE T_APPLICATION_VERSION SET APPLICANT_NAME = ?, APPLICANT_KANA = ?, TEL_NO = ?, MAIL_ADDRESS = ?, ADDRESS = ?, "
                 + "PRODUCT_CD = ?, BASIC_FEE = ?, OPTION_FEE = ?, HANDLING_FEE = ?, TOTAL_AMOUNT = ?, CONTRACT_START_DATE = ?, CONTRACT_END_DATE = ?, AMOUNT_RATIO = ?, REMARKS = ?, CONFIRMED_AT = ?, "
-                + "UPDATED_AT = ?, UPDATED_BY = ?, ROW_VERSION = ROW_VERSION + 1 WHERE APPLICATION_ID = ? AND VERSION_NO = ?",
+                + "CORPORATE_NO = ?, INSTALL_PLACE = ?, CONTACT_MEMO = ?, UPDATED_AT = ?, UPDATED_BY = ?, ROW_VERSION = ROW_VERSION + 1 WHERE APPLICATION_ID = ? AND VERSION_NO = ?",
                 v.getApplicantName(), v.getApplicantKana(), v.getTelNo(), v.getMailAddress(), v.getAddress(),
                 v.getProductCd(), v.getBasicFee(), v.getOptionFee(), v.getHandlingFee(), v.getTotalAmount(), v.getContractStartDate(), v.getContractEndDate(), v.getAmountRatio(), v.getRemarks(), v.getConfirmedAt(),
-                now(), actor(), v.getApplicationId(), v.getVersionNo());
+                v.getCorporateNo(), v.getInstallPlace(), v.getContactMemo(), now(), actor(), v.getApplicationId(), v.getVersionNo());
     }
 
     public void updateFixed(Connection conn, long applicationId, int versionNo) {

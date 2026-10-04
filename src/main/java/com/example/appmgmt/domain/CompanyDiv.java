@@ -17,4 +17,6 @@ public class CompanyDiv extends AuditedEntity {
     public BigDecimal getAmountRatioLimit() { return amountRatioLimit; }
     public void setAmountRatioLimit(BigDecimal amountRatioLimit) { this.amountRatioLimit = amountRatioLimit; }
     public boolean isPreCheck() { return Codes.FLG_ON.equals(preCheckFlg); }
+    /** この会社区分の申込に会社B の追加項目があるか。 */
+    public boolean isCompanyExtraTarget() { return Codes.hasCompanyExtra(companyDiv); }
 }

@@ -40,14 +40,24 @@ async function accountFor(page, appNo) {
   const pw = body.match(/初期パスワード：(\S+)/)[1];
   return { id, pw };
 }
-async function applicantConsent(ctx, url, { modifyFirst = false, agree = true, returnReason = null } = {}) {
+async function applicantConsent(ctx, url, { modifyFirst = false, agree = true, returnReason = null, expectTexts = [] } = {}) {
   const page = await ctx.newPage();
   await page.goto(url);
+  const expectOnPage = async (when) => {
+    const t = await page.locator('.version-table').first().textContent();
+    for (const x of expectTexts) { if (!t.includes(x)) throw new Error(`AP01 (${when}) should show ${x}`); }
+    // 担当（申込受付会社）は社員向けの情報。社員が同じブラウザで開いても申込者向け画面には出さない
+    if (t.includes('担当（申込受付会社）')) throw new Error(`AP01 (${when}) must not show the employee-side assignment`);
+  };
+  await expectOnPage('表示');
   if (modifyFirst) {
     await page.click('a:has-text("内容を修正する")');
+    // 会社B の追加項目は申込者には表示だけ（AP02 に入力欄はない）
+    if (await page.locator('#corporateNo, #installPlace, #contactMemo').count() !== 0) throw new Error('AP02 must not show company B extra inputs');
     await page.fill('#remarks', '申込者が備考を修正しました');
     await page.click('button:has-text("保存")');
     await page.waitForLoadState('networkidle');
+    await expectOnPage('AP02 保存後');
   }
   await shot(page, 'AP01');
   await page.click('label[for=checked]'); await page.click('#confirmBtn'); await page.waitForURL('**/agree');
@@ -82,9 +92,15 @@ async function fillApplicant(page, applicant) {
   await page.fill('#mailAddress', applicant.mail); await page.fill('#telNo', applicant.tel || ''); await page.fill('#address', applicant.address || '');
 }
 async function applicantNoOnMenu(page) { const m = (await page.locator('.menu-head').textContent()).match(/C\d{10}/); return m ? m[0] : null; }
-async function createApplication(page, applicant, basic, option) {
+async function createApplication(page, applicant, basic, option, extra = null) {
   await page.goto(BASE + '/emp/applications/new');
   await fillApplicant(page, applicant); await page.fill('#productCd', 'PRD001');
+  if (extra) {
+    if (!(await page.locator('#companyExtra').isVisible())) throw new Error('SC04: company B extra items should be visible for company B');
+    await page.fill('#corporateNo', extra.corporateNo); await page.fill('#installPlace', extra.installPlace); await page.fill('#contactMemo', extra.contactMemo);
+  } else if (await page.locator('#companyExtra').isVisible()) {
+    throw new Error('SC04: company B extra items should be hidden for company A');
+  }
   await page.fill('#basicFee', basic); await page.fill('#optionFee', option); await page.fill('#handlingFee', '0');
   await page.fill('#contractStartDate', '2026/11/01'); await page.fill('#contractEndDate', '2027/10/31'); await page.fill('#remarks', 'E2E テスト');
   await shot(page, 'SC04');
@@ -261,6 +277,7 @@ async function portalLogin(apPage, id, pw) {
     // 一部修正（基準内）→ 10501 のまま、基準超 → 10201
     await login(page, 'A001');
     await page.goto(BASE + '/emp/applications/' + a.appId + '/revise'); await shot(page, 'SC07');
+    if (await page.locator('#companyExtra, #corporateNo').count() !== 0) throw new Error('SC07: company A must not show company B extra items');
     await page.fill('#optionFee', '300000'); await page.click('button:has-text("確定")'); await page.waitForLoadState('networkidle');
     await expectStatus(page, '10501', '一部修正（基準内）');
     await page.goto(BASE + '/emp/applications/' + a.appId + '/revise');
@@ -407,6 +424,12 @@ async function portalLogin(apPage, id, pw) {
     if (defaults[0] !== '1' || defaults[1] !== '100' || !defaults[2].includes('会社A 担当 太郎')) throw new Error('SC04: assignment should default to the login user, got ' + defaults.join(' / '));
     await fillApplicant(page, { name: '伊藤 さくら', kana: 'イトウ サクラ', mail: 'sakura.ito@example.com' }); await page.fill('#productCd', 'PRD001');
     await page.fill('#basicFee', '600000'); await page.fill('#optionFee', '0'); await page.fill('#handlingFee', '0');
+    // 会社B の追加項目は担当会社を会社B にしたときだけ表示・送信する
+    await page.selectOption('#companyDiv', '2');
+    if (!(await page.locator('#companyExtra').isVisible()) || await page.locator('#corporateNo').isDisabled()) throw new Error('SC04: extra items should appear when company B is selected');
+    await page.selectOption('#companyDiv', '1');
+    if (await page.locator('#companyExtra').isVisible() || !(await page.locator('#corporateNo').isDisabled())) throw new Error('SC04: extra items should be hidden and disabled for company A');
+    console.log('OK  SC04：会社B の追加項目は担当会社の選択で表示・非表示（会社A では送信しない）');
     await page.selectOption('#deptCd', '110'); await page.selectOption('#ownerEmployeeId', { label: '会社A 担当 四葉（営業第二部）' });
     await page.locator('#assignCard').scrollIntoViewIfNeeded(); await shot(page, 'SC04-assign');
     let dialogText = '';
@@ -439,16 +462,23 @@ async function portalLogin(apPage, id, pw) {
 
     // ---------- 会社B（事前確認あり）----------
     await login(page, 'B001');
-    const b = await createApplication(page, { name: '佐藤 次郎', kana: 'サトウ ジロウ', mail: 'jiro.sato@example.com', tel: '06-0000-0003', address: '大阪府大阪市北区梅田3-3-3' }, '3000000', '0');
+    const B_EXTRA = { corporateNo: '1234567890123', installPlace: '大阪支店 3 階 サーバ室', contactMemo: '平日 9 時〜17 時\n総務部 経由' };
+    const b = await createApplication(page, { name: '佐藤 次郎', kana: 'サトウ ジロウ', mail: 'jiro.sato@example.com', tel: '06-0000-0003', address: '大阪府大阪市北区梅田3-3-3' }, '3000000', '0', B_EXTRA);
+    await page.goto(BASE + '/emp/applications/' + b.appId + '/confirm');
+    const bView = await page.locator('.version-table').first().textContent();
+    if (!bView.includes('会社B 追加項目') || !bView.includes(B_EXTRA.corporateNo) || !bView.includes(B_EXTRA.installPlace)) throw new Error('SC05: company B extra items should be shown');
+    console.log('OK  会社B の新規申込：追加項目（法人番号・設置場所・窓口メモ）を入力して SC05 に表示');
     await applyApproval(page, b.appId, { approvers: [] }); await expectStatus(page, '10301', 'B 回付先なし');
     await page.goto(BASE + '/emp/applications/' + b.appId + '/menu'); b.applicantNo = await applicantNoOnMenu(page);
     if (!b.applicantNo) throw new Error('B account should be issued when reaching 10301');
     const urlB = await consentUrlFor(page, b.appNo);
-    await applicantConsent(ctx, urlB, {});
+    await applicantConsent(ctx, urlB, { modifyFirst: true, expectTexts: [B_EXTRA.corporateNo, B_EXTRA.installPlace] });
+    console.log('OK  申込者画面：会社B の追加項目は表示だけ（AP02 に入力欄なし、申込者の保存後も値は残る）');
     await page.goto(BASE + '/emp/applications/' + b.appId); await expectStatus(page, '10401', 'B 同意 → 事前確認待ち');
     await mockResult(page, b.appNo, 'NG', '契約期間を確認してください');
     await page.goto(BASE + '/emp/applications/' + b.appId); await expectStatus(page, '10402', 'B 事前確認 NG');
     await page.goto(BASE + '/emp/applications/' + b.appId + '/revise'); await shot(page, 'SC07-fix');
+    if (await page.inputValue('#corporateNo') !== B_EXTRA.corporateNo) throw new Error('SC07: company B extra items should be editable with current values');
     await page.fill('#contractEndDate', '2027/12/31'); await page.click('button:has-text("確定")'); await page.waitForLoadState('networkidle');
     await expectStatus(page, '10401', 'B 修正対応（基準内）→ 事前確認再依頼');
     await mockResult(page, b.appNo, 'OK');
@@ -464,9 +494,14 @@ async function portalLogin(apPage, id, pw) {
     await page.fill('#address', '大阪府大阪市北区梅田9-9-9'); await page.fill('#remarks', '全体修正で備考を変更');
     // 担当部署も入力中（全体修正後の再入力）なら変えられる
     await page.selectOption('#deptCd', '210');
+    // 会社B の追加項目も入力中に変えられる（書式の誤りは E003）
+    await page.fill('#corporateNo', '12345'); await page.click('button[value=confirm]'); await page.waitForLoadState('networkidle');
+    if (!(await page.locator('#corporateNo.is-invalid').count())) throw new Error('SC04: invalid corporate number should be rejected');
+    await page.fill('#corporateNo', '9876543210987');
     await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
     const changedCells = await page.locator('td.changed').count();
-    if (changedCells < 3) throw new Error('full revise: changed department, applicant address and remarks should be red, got ' + changedCells);
+    if (changedCells < 4) throw new Error('full revise: changed department, applicant address, remarks and corporate number should be red, got ' + changedCells);
+    if (!(await page.locator('td.changed', { hasText: '9876543210987' }).count())) throw new Error('full revise: the changed corporate number should be red');
     if (!(await page.locator('td.changed', { hasText: '法人営業部（210）' }).count())) throw new Error('full revise: the changed department should be red');
     console.log('OK  全体修正の変更項目を赤字表示: ' + changedCells + ' 項目'); await shot(page, 'SC05-fullrevise-diff');
     await page.click('button[value=confirm]'); await page.waitForLoadState('networkidle'); await expectStatus(page, '10201', 'B 再確定');

@@ -1,9 +1,9 @@
-<%-- 申込内容（担当・申込者情報を含む）の参照表。担当は社員向け画面（user あり）だけに出す。cur：表示する版、base：比較元（null なら差分列なし）、baseLabel：比較元列の見出し、diffBase：全体修正の複写元（設定時は異なる項目を赤字） --%>
+<%-- 申込内容（担当・申込者情報を含む）の参照表。担当は社員向け画面だけに出す（申込者向け画面は include の前に applicantView = true を設定する）。cur：表示する版、base：比較元（null なら差分列なし）、baseLabel：比較元列の見出し、diffBase：全体修正の複写元（設定時は異なる項目を赤字）。会社B の追加項目は担当会社が会社B の版だけ（申込者向け画面にも表示する） --%>
 <table class="table table-sm table-bordered version-table mb-3">
   <thead class="thead-light"><tr><th style="width: 24%;">項目</th><th>${empty curLabel ? '現行版' : curLabel}（第 ${cur.versionNo} 版 <c:out value="${cur.versionTypeName}"/>）</th>
     <c:if test="${not empty base}"><th>${empty baseLabel ? '基準版' : baseLabel}（第 ${base.versionNo} 版 <c:out value="${base.versionTypeName}"/>）</th></c:if></tr></thead>
   <tbody>
-    <c:if test="${not empty user}"><%-- 担当（申込受付会社側）は社員向け画面だけに表示する --%>
+    <c:if test="${not applicantView}"><%-- 担当（申込受付会社側）は社員向け画面だけに表示する。社員が同じブラウザで申込者向け画面を開いても出さない --%>
     <tr class="table-light"><th colspan="${empty base ? 2 : 3}" class="small text-muted">担当（申込受付会社）</th></tr>
     <tr><th>会社</th><td class="${not empty base and app:differs(cur.companyDiv, base.companyDiv) ? 'diff' : ''} ${not empty diffBase and app:differs(cur.companyDiv, diffBase.companyDiv) ? 'changed' : ''}"><c:out value="${app:text(cur.companyDivName)}"/></td><c:if test="${not empty base}"><td><c:out value="${app:text(base.companyDivName)}"/></td></c:if></tr>
     <tr><th>部署</th><td class="${not empty base and (app:differs(cur.companyDiv, base.companyDiv) or app:differs(cur.deptCd, base.deptCd)) ? 'diff' : ''} ${not empty diffBase and (app:differs(cur.companyDiv, diffBase.companyDiv) or app:differs(cur.deptCd, diffBase.deptCd)) ? 'changed' : ''}"><c:out value="${app:text(cur.deptName)}"/>（<c:out value="${cur.deptCd}"/>）</td><c:if test="${not empty base}"><td><c:out value="${app:text(base.deptName)}"/>（<c:out value="${base.deptCd}"/>）</td></c:if></tr>
@@ -23,5 +23,11 @@
     <tr class="font-weight-bold"><th>申込金額合計</th><td class="text-right ${not empty base and app:differs(cur.totalAmount, base.totalAmount) ? 'diff' : ''} ${not empty diffBase and app:differs(cur.totalAmount, diffBase.totalAmount) ? 'changed' : ''}">${app:amount(cur.totalAmount)} 円</td><c:if test="${not empty base}"><td class="text-right">${app:amount(base.totalAmount)} 円</td></c:if></tr>
     <tr><th>契約期間</th><td class="${not empty base and (app:differs(cur.contractStartDate, base.contractStartDate) or app:differs(cur.contractEndDate, base.contractEndDate)) ? 'diff' : ''} ${not empty diffBase and (app:differs(cur.contractStartDate, diffBase.contractStartDate) or app:differs(cur.contractEndDate, diffBase.contractEndDate)) ? 'changed' : ''}">${app:date(cur.contractStartDate)} 〜 ${app:date(cur.contractEndDate)}</td><c:if test="${not empty base}"><td>${app:date(base.contractStartDate)} 〜 ${app:date(base.contractEndDate)}</td></c:if></tr>
     <tr><th>備考</th><td class="pre-wrap ${not empty base and app:differs(cur.remarks, base.remarks) ? 'diff' : ''} ${not empty diffBase and app:differs(cur.remarks, diffBase.remarks) ? 'changed' : ''}"><c:out value="${app:text(cur.remarks)}"/></td><c:if test="${not empty base}"><td class="pre-wrap"><c:out value="${app:text(base.remarks)}"/></td></c:if></tr>
+    <c:if test="${cur.companyExtraTarget or (not empty base and base.companyExtraTarget)}">
+    <tr class="table-light" id="companyExtraRows"><th colspan="${empty base ? 2 : 3}" class="small text-muted">会社B 追加項目</th></tr>
+    <tr><th>法人番号</th><td class="${not empty base and app:differs(cur.corporateNo, base.corporateNo) ? 'diff' : ''} ${not empty diffBase and app:differs(cur.corporateNo, diffBase.corporateNo) ? 'changed' : ''}"><c:out value="${app:text(cur.corporateNo)}"/></td><c:if test="${not empty base}"><td><c:out value="${app:text(base.corporateNo)}"/></td></c:if></tr>
+    <tr><th>設置場所</th><td class="${not empty base and app:differs(cur.installPlace, base.installPlace) ? 'diff' : ''} ${not empty diffBase and app:differs(cur.installPlace, diffBase.installPlace) ? 'changed' : ''}"><c:out value="${app:text(cur.installPlace)}"/></td><c:if test="${not empty base}"><td><c:out value="${app:text(base.installPlace)}"/></td></c:if></tr>
+    <tr><th>窓口メモ</th><td class="pre-wrap ${not empty base and app:differs(cur.contactMemo, base.contactMemo) ? 'diff' : ''} ${not empty diffBase and app:differs(cur.contactMemo, diffBase.contactMemo) ? 'changed' : ''}"><c:out value="${app:text(cur.contactMemo)}"/></td><c:if test="${not empty base}"><td class="pre-wrap"><c:out value="${app:text(base.contactMemo)}"/></td></c:if></tr>
+    </c:if>
   </tbody>
 </table>

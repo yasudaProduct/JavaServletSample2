@@ -14,6 +14,11 @@ public final class Codes {
     public static final String COMPANY_DIV_A = "1";
     public static final String COMPANY_DIV_B = "2";
 
+    /** 会社B（会社区分 2）だけの申込の追加項目（法人番号・設置場所・窓口メモ）を入力する会社区分か。項目を使った制御はない。 */
+    public static boolean hasCompanyExtra(String companyDiv) {
+        return COMPANY_DIV_B.equals(companyDiv);
+    }
+
     // 権限
     public static final String ROLE_OWNER = "01";
     public static final String ROLE_APPROVER = "02";

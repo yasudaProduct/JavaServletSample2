@@ -149,6 +149,7 @@ public class ApplicationService {
 
             ApplicationVersion v = content.copyContent();
             v.applyAssignmentFrom(a.getCompanyDiv(), a.getDeptCd(), a.getOwnerEmployeeId());
+            v.applyCompanyExtraFrom(content, a.getCompanyDiv());
             v.setApplicationId(id);
             v.setVersionNo(1);
             v.setVersionType(Codes.VERSION_NEW);
@@ -194,6 +195,7 @@ public class ApplicationService {
                 versionDao.updateAssignment(conn, applicationId, v.getVersionNo(), assignment.getCompanyDiv(), assignment.getDeptCd(), assignment.getOwnerEmployeeId());
             }
             applyContent(v, content);
+            v.applyCompanyExtraFrom(content, assignment != null ? assignment.getCompanyDiv() : app.getCompanyDiv());
             v.setAmountRatio(null);
             versionDao.updateContent(conn, v);
             if (applicationDao.touch(conn, applicationId, rowVersion) != 1) {
@@ -243,6 +245,7 @@ public class ApplicationService {
                 merged.setHandlingFee(content.getHandlingFee());
             } else {
                 applyContent(merged, content);
+                merged.applyCompanyExtraFrom(content, app.getCompanyDiv());
             }
             merged.recalcTotal();
             boolean changed = !merged.sameContentAs(current);
