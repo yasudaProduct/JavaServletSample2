@@ -31,7 +31,7 @@
           <div class="form-inline mb-2">
             <select class="form-control form-control-sm mr-2" id="candidateSelect">
               <option value="">承認者を選択</option>
-              <c:forEach var="e" items="${v.candidates}"><option value="${e.employeeId}"><c:out value="${e.employeeName}"/>（<c:out value="${e.deptCd}"/>）</option></c:forEach>
+              <c:forEach var="e" items="${v.candidates}"><option value="${e.employeeId}"><c:out value="${e.employeeName}"/>（<c:out value="${e.deptName}"/>）</option></c:forEach>
             </select>
             <button type="button" class="btn btn-outline-secondary btn-sm mr-2" id="addRoute">行追加</button>
             <button type="button" class="btn btn-outline-secondary btn-sm" id="resetRoute">テンプレートに戻す</button>
@@ -40,7 +40,7 @@
           <button type="submit" name="action" value="apply" class="btn btn-success mr-2" id="applyBtn">申請</button>
           <a class="btn btn-outline-secondary" href="${ctx}/emp/applications/${a.applicationId}/menu">メニューへ戻る</a>
         </form>
-        <script type="application/json" id="routeCandidates">[<c:forEach var="e" items="${v.candidates}" varStatus="st">{"id":${e.employeeId},"name":"${fn:escapeXml(e.employeeName)}","dept":"${fn:escapeXml(e.deptCd)}"}${st.last ? '' : ','}</c:forEach>]</script>
+        <script type="application/json" id="routeCandidates">[<c:forEach var="e" items="${v.candidates}" varStatus="st">{"id":${e.employeeId},"name":"${fn:escapeXml(e.employeeName)}","dept":"${fn:escapeXml(e.deptName)}"}${st.last ? '' : ','}</c:forEach>]</script>
         <script type="application/json" id="routeInitial">[<c:forEach var="id" items="${initialApproverIds}" varStatus="st">${id}${st.last ? '' : ','}</c:forEach>]</script>
       </c:when>
       <c:otherwise>

@@ -12,6 +12,7 @@ public class LoginUser implements Serializable {
     private final String companyDiv;
     private final String companyDivName;
     private final String deptCd;
+    private final String deptName;
 
     public LoginUser(Employee e, String companyDivName) {
         this.employeeId = e.getEmployeeId();
@@ -21,6 +22,7 @@ public class LoginUser implements Serializable {
         this.companyDiv = e.getCompanyDiv();
         this.companyDivName = companyDivName;
         this.deptCd = e.getDeptCd();
+        this.deptName = e.getDeptName();
     }
 
     public long getEmployeeId() { return employeeId; }
@@ -30,6 +32,7 @@ public class LoginUser implements Serializable {
     public String getCompanyDiv() { return companyDiv; }
     public String getCompanyDivName() { return companyDivName; }
     public String getDeptCd() { return deptCd; }
+    public String getDeptName() { return deptName; }
     public String getRoleName() { return Codes.label("ROLE", roleCd); }
     public boolean isOwner() { return Codes.ROLE_OWNER.equals(roleCd); }
     public boolean isApprover() { return Codes.ROLE_APPROVER.equals(roleCd); }

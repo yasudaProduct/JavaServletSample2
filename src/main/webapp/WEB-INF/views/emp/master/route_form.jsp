@@ -6,9 +6,9 @@
   <input type="hidden" name="rowVersion" value="${r.rowVersion}">
   <div class="form-row">
     <div class="form-group col-md-3"><label>会社区分</label>
-      <select class="form-control" name="companyDiv"><c:forEach var="d" items="${companyDivs}"><option value="${d.companyDiv}" ${r.companyDiv == d.companyDiv ? 'selected' : ''}><c:out value="${d.companyDivName}"/></option></c:forEach></select></div>
-    <div class="form-group col-md-3"><label>部署コード <span class="badge badge-danger">必須</span></label>
-      <input type="text" class="form-control ${not empty errors.deptCd ? 'is-invalid' : ''}" name="deptCd" maxlength="10" value="<c:out value='${r.deptCd}'/>"><div class="invalid-feedback"><c:out value="${errors.deptCd}"/></div></div>
+      <select class="form-control" id="companyDiv" name="companyDiv"><c:forEach var="d" items="${companyDivs}"><option value="${d.companyDiv}" ${r.companyDiv == d.companyDiv ? 'selected' : ''}><c:out value="${d.companyDivName}"/></option></c:forEach></select></div>
+    <div class="form-group col-md-3"><label>部署 <span class="badge badge-danger">必須</span></label>
+      <select class="form-control ${not empty errors.deptCd ? 'is-invalid' : ''}" id="deptCd" name="deptCd" data-company-source="companyDiv"><c:forEach var="dp" items="${departments}"><c:if test="${dp.valid or (dp.companyDiv == r.companyDiv and dp.deptCd == r.deptCd)}"><option value="${dp.deptCd}" data-company="${dp.companyDiv}" ${dp.companyDiv == r.companyDiv and dp.deptCd == r.deptCd ? 'selected' : ''}><c:out value="${dp.deptName}"/>（<c:out value="${dp.deptCd}"/>）${dp.valid ? '' : '（無効）'}</option></c:if></c:forEach></select><div class="invalid-feedback"><c:out value="${errors.deptCd}"/></div></div>
     <div class="form-group col-md-6"><label>承認種別</label>
       <select class="form-control" name="approvalType"><c:forEach var="t" items="${['01','02','03','04']}"><option value="${t}" ${r.approvalType == t ? 'selected' : ''}>${t} ${app:label('APPROVAL_TYPE', t)}</option></c:forEach></select></div>
   </div>
@@ -26,7 +26,7 @@
     <c:forEach var="i" begin="0" end="4">
       <select class="form-control form-control-sm mb-1" name="approverId">
         <option value="">（ステップ ${i + 1}：なし）</option>
-        <c:forEach var="e" items="${candidates}"><option value="${e.employeeId}" ${not empty r.steps[i] and r.steps[i].approverEmployeeId == e.employeeId ? 'selected' : ''}>${app:label('COMPANY_DIV', e.companyDiv)}：<c:out value="${e.employeeName}"/>（<c:out value="${e.deptCd}"/>）</option></c:forEach>
+        <c:forEach var="e" items="${candidates}"><option value="${e.employeeId}" ${not empty r.steps[i] and r.steps[i].approverEmployeeId == e.employeeId ? 'selected' : ''}>${app:label('COMPANY_DIV', e.companyDiv)}：<c:out value="${e.employeeName}"/>（<c:out value="${e.deptName}"/>）</option></c:forEach>
       </select>
     </c:forEach>
   </div>

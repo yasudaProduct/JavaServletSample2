@@ -10,9 +10,15 @@ import java.util.Optional;
 
 public class ApplicationVersionDao extends AbstractDao {
 
-    private static final String SELECT = "SELECT APPLICATION_ID, VERSION_NO, VERSION_TYPE, COPIED_FROM_VERSION_NO, APPLICANT_NAME, APPLICANT_KANA, TEL_NO, MAIL_ADDRESS, ADDRESS, "
-            + "PRODUCT_CD, BASIC_FEE, OPTION_FEE, HANDLING_FEE, TOTAL_AMOUNT, CONTRACT_START_DATE, CONTRACT_END_DATE, "
-            + "AMOUNT_RATIO, REMARKS, CONFIRMED_AT, FIXED_FLG, CANCELED_FLG, " + AUDIT_COLS + " FROM T_APPLICATION_VERSION";
+    /** 担当の表示名（会社区分名・部署名・担当社員名）も結合して取る。 */
+    private static final String SELECT = "SELECT v.APPLICATION_ID, v.VERSION_NO, v.VERSION_TYPE, v.COPIED_FROM_VERSION_NO, v.APPLICANT_NAME, v.APPLICANT_KANA, v.TEL_NO, v.MAIL_ADDRESS, v.ADDRESS, "
+            + "v.PRODUCT_CD, v.BASIC_FEE, v.OPTION_FEE, v.HANDLING_FEE, v.TOTAL_AMOUNT, v.CONTRACT_START_DATE, v.CONTRACT_END_DATE, "
+            + "v.AMOUNT_RATIO, v.REMARKS, v.CONFIRMED_AT, v.FIXED_FLG, v.CANCELED_FLG, v.COMPANY_DIV, v.DEPT_CD, v.OWNER_EMPLOYEE_ID, "
+            + "c.COMPANY_DIV_NAME, d.DEPT_NAME, e.EMPLOYEE_NAME AS OWNER_NAME, "
+            + "v.CREATED_AT, v.CREATED_BY, v.UPDATED_AT, v.UPDATED_BY, v.ROW_VERSION FROM T_APPLICATION_VERSION v "
+            + "LEFT JOIN M_COMPANY_DIV c ON c.COMPANY_DIV = v.COMPANY_DIV "
+            + "LEFT JOIN M_DEPARTMENT d ON d.COMPANY_DIV = v.COMPANY_DIV AND d.DEPT_CD = v.DEPT_CD "
+            + "LEFT JOIN M_EMPLOYEE e ON e.EMPLOYEE_ID = v.OWNER_EMPLOYEE_ID";
 
     static ApplicationVersion map(ResultSet rs) throws SQLException {
         ApplicationVersion v = new ApplicationVersion();
@@ -37,12 +43,18 @@ public class ApplicationVersionDao extends AbstractDao {
         v.setConfirmedAt(ts(rs, "CONFIRMED_AT"));
         v.setFixedFlg(rs.getString("FIXED_FLG"));
         v.setCanceledFlg(rs.getString("CANCELED_FLG"));
+        v.setCompanyDiv(rs.getString("COMPANY_DIV"));
+        v.setDeptCd(rs.getString("DEPT_CD"));
+        v.setOwnerEmployeeId(longObj(rs, "OWNER_EMPLOYEE_ID"));
+        v.setCompanyDivName(rs.getString("COMPANY_DIV_NAME"));
+        v.setDeptName(rs.getString("DEPT_NAME"));
+        v.setOwnerName(rs.getString("OWNER_NAME"));
         mapAudit(rs, v);
         return v;
     }
 
     public Optional<ApplicationVersion> find(Connection conn, long applicationId, int versionNo) {
-        return queryOne(conn, SELECT + " WHERE APPLICATION_ID = ? AND VERSION_NO = ?", ApplicationVersionDao::map, applicationId, versionNo);
+        return queryOne(conn, SELECT + " WHERE v.APPLICATION_ID = ? AND v.VERSION_NO = ?", ApplicationVersionDao::map, applicationId, versionNo);
     }
 
     public ApplicationVersion get(Connection conn, long applicationId, int versionNo) {
@@ -50,19 +62,26 @@ public class ApplicationVersionDao extends AbstractDao {
     }
 
     public List<ApplicationVersion> findAll(Connection conn, long applicationId) {
-        return query(conn, SELECT + " WHERE APPLICATION_ID = ? ORDER BY VERSION_NO DESC", ApplicationVersionDao::map, applicationId);
+        return query(conn, SELECT + " WHERE v.APPLICATION_ID = ? ORDER BY v.VERSION_NO DESC", ApplicationVersionDao::map, applicationId);
     }
 
     public void insert(Connection conn, ApplicationVersion v) {
         v.recalcTotal();
         update(conn, "INSERT INTO T_APPLICATION_VERSION (APPLICATION_ID, VERSION_NO, VERSION_TYPE, COPIED_FROM_VERSION_NO, APPLICANT_NAME, APPLICANT_KANA, TEL_NO, MAIL_ADDRESS, ADDRESS, "
                 + "PRODUCT_CD, BASIC_FEE, OPTION_FEE, HANDLING_FEE, TOTAL_AMOUNT, CONTRACT_START_DATE, CONTRACT_END_DATE, "
-                + "AMOUNT_RATIO, REMARKS, CONFIRMED_AT, FIXED_FLG, CANCELED_FLG, " + AUDIT_COLS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                + "AMOUNT_RATIO, REMARKS, CONFIRMED_AT, FIXED_FLG, CANCELED_FLG, COMPANY_DIV, DEPT_CD, OWNER_EMPLOYEE_ID, " + AUDIT_COLS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
                 v.getApplicationId(), v.getVersionNo(), v.getVersionType(), v.getCopiedFromVersionNo(),
                 v.getApplicantName(), v.getApplicantKana(), v.getTelNo(), v.getMailAddress(), v.getAddress(),
                 v.getProductCd(), v.getBasicFee(), v.getOptionFee(), v.getHandlingFee(), v.getTotalAmount(),
                 v.getContractStartDate(), v.getContractEndDate(), v.getAmountRatio(), v.getRemarks(), v.getConfirmedAt(),
-                v.getFixedFlg() == null ? Codes.FLG_OFF : v.getFixedFlg(), v.getCanceledFlg() == null ? Codes.FLG_OFF : v.getCanceledFlg(), now(), actor(), now(), actor());
+                v.getFixedFlg() == null ? Codes.FLG_OFF : v.getFixedFlg(), v.getCanceledFlg() == null ? Codes.FLG_OFF : v.getCanceledFlg(),
+                v.getCompanyDiv(), v.getDeptCd(), v.getOwnerEmployeeId(), now(), actor(), now(), actor());
+    }
+
+    /** 版の担当（会社区分・部署・担当社員）の更新。申込入力（SC04）の保存で、申込の担当と一緒に更新する。 */
+    public void updateAssignment(Connection conn, long applicationId, int versionNo, String companyDiv, String deptCd, long ownerEmployeeId) {
+        update(conn, "UPDATE T_APPLICATION_VERSION SET COMPANY_DIV = ?, DEPT_CD = ?, OWNER_EMPLOYEE_ID = ?, UPDATED_AT = ?, UPDATED_BY = ? WHERE APPLICATION_ID = ? AND VERSION_NO = ?",
+                companyDiv, deptCd, ownerEmployeeId, now(), actor(), applicationId, versionNo);
     }
 
     /** 申込内容（申込者情報・商品・金額・契約期間・備考・倍率・確定日時）の更新。 */

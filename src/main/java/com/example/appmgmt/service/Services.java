@@ -8,6 +8,7 @@ import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.ApprovalRequestDao;
 import com.example.appmgmt.dao.ApprovalRouteDao;
 import com.example.appmgmt.dao.CompanyDivDao;
+import com.example.appmgmt.dao.DepartmentDao;
 import com.example.appmgmt.dao.EmployeeDao;
 import com.example.appmgmt.dao.ExternalLinkDao;
 import com.example.appmgmt.dao.ImportBatchDao;
@@ -40,6 +41,7 @@ public final class Services {
 
     private final CompanyDivDao companyDivDao = new CompanyDivDao();
     private final EmployeeDao employeeDao = new EmployeeDao();
+    private final DepartmentDao departmentDao = new DepartmentDao();
     private final ApplicantAccountDao applicantAccountDao = new ApplicantAccountDao();
     private final StatusDao statusDao = new StatusDao();
     private final StatusTransitionDao statusTransitionDao = new StatusTransitionDao();
@@ -78,15 +80,15 @@ public final class Services {
         statusTransitionService = new StatusTransitionService(applicationDao, applicationVersionDao, companyDivDao, statusTransitionDao, statusHistoryDao,
                 approvalRequestDao, applicantConsentDao, externalLinkDao, notificationService, consentIssuer, applicantAuthService);
         applicationQueryService = new ApplicationQueryService(applicationDao, applicationVersionDao, applicantAccountDao, employeeDao, statusDao, companyDivDao,
-                approvalRequestDao, applicantConsentDao, externalLinkDao, statusHistoryDao, statusTransitionDao);
-        applicationService = new ApplicationService(applicationDao, applicationVersionDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer);
+                approvalRequestDao, applicantConsentDao, externalLinkDao, statusHistoryDao, statusTransitionDao, departmentDao);
+        applicationService = new ApplicationService(applicationDao, applicationVersionDao, statusHistoryDao, externalLinkDao, statusTransitionService, consentIssuer, companyDivDao, departmentDao, employeeDao);
         importService = new ImportService(applicationDao, applicationVersionDao, importBatchDao, statusHistoryDao);
         approvalService = new ApprovalService(applicationDao, approvalRequestDao, approvalRouteDao, employeeDao, applicationQueryService, statusTransitionService, notificationService);
         consentService = new ConsentService(applicantConsentDao, applicationDao, applicationVersionDao, applicantAccountDao, statusDao, statusTransitionService);
         externalRequestBuilder = new ExternalRequestBuilder(applicationDao, applicationVersionDao, applicantAccountDao);
         externalResultService = new ExternalResultService(externalLinkDao, applicationDao, statusTransitionService);
         authService = new AuthService(employeeDao, companyDivDao);
-        masterService = new MasterService(employeeDao, companyDivDao, approvalRouteDao);
+        masterService = new MasterService(employeeDao, companyDivDao, approvalRouteDao, departmentDao);
         mailSender = MailSender.create(config);
         externalApiClient = ExternalApiClient.create(config);
         notificationSendJob = new NotificationSendJob(notificationDao, mailSender, config);
@@ -107,6 +109,7 @@ public final class Services {
 
     public CompanyDivDao getCompanyDivDao() { return companyDivDao; }
     public EmployeeDao getEmployeeDao() { return employeeDao; }
+    public DepartmentDao getDepartmentDao() { return departmentDao; }
     public ApplicantAccountDao getApplicantAccountDao() { return applicantAccountDao; }
     public StatusDao getStatusDao() { return statusDao; }
     public StatusTransitionDao getStatusTransitionDao() { return statusTransitionDao; }

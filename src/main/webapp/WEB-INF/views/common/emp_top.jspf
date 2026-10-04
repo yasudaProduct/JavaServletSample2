@@ -21,6 +21,7 @@
           <div class="dropdown-menu">
             <a class="dropdown-item" href="${ctx}/emp/master/employees">社員マスタ</a>
             <a class="dropdown-item" href="${ctx}/emp/master/company-divs">会社区分マスタ</a>
+            <a class="dropdown-item" href="${ctx}/emp/master/departments">部署マスタ</a>
             <a class="dropdown-item" href="${ctx}/emp/master/approval-routes">承認ルートマスタ</a>
           </div>
         </li>
@@ -37,7 +38,7 @@
     </ul>
     <c:if test="${not empty user}">
       <span class="navbar-text mr-3">
-        <c:out value="${user.employeeName}"/>（<c:out value="${user.roleName}"/>／<c:out value="${user.companyDivName}"/>／部署 <c:out value="${user.deptCd}"/>）
+        <c:out value="${user.employeeName}"/>（<c:out value="${user.roleName}"/>／<c:out value="${user.companyDivName}"/>／<c:out value="${user.deptName}"/>）
       </span>
       <form method="post" action="${ctx}/emp/logout" class="form-inline">
         <input type="hidden" name="_csrf" value="${csrf}">

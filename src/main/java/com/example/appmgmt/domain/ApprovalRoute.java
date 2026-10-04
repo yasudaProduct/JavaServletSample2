@@ -8,6 +8,8 @@ public class ApprovalRoute extends AuditedEntity {
     private long routeId;
     private String companyDiv;
     private String deptCd;
+    /** 表示用：部署名（M_DEPARTMENT） */
+    private String deptName;
     private String approvalType;
     private String routeName;
     private LocalDate validFrom;
@@ -20,6 +22,8 @@ public class ApprovalRoute extends AuditedEntity {
     public void setCompanyDiv(String companyDiv) { this.companyDiv = companyDiv; }
     public String getDeptCd() { return deptCd; }
     public void setDeptCd(String deptCd) { this.deptCd = deptCd; }
+    public String getDeptName() { return deptName; }
+    public void setDeptName(String deptName) { this.deptName = deptName; }
     public String getApprovalType() { return approvalType; }
     public void setApprovalType(String approvalType) { this.approvalType = approvalType; }
     public String getRouteName() { return routeName; }

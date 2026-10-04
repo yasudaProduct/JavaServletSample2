@@ -11,7 +11,8 @@ import java.util.Optional;
 
 public class ApprovalRouteDao extends AbstractDao {
 
-    private static final String SELECT = "SELECT ROUTE_ID, COMPANY_DIV, DEPT_CD, APPROVAL_TYPE, ROUTE_NAME, VALID_FROM, VALID_TO, " + AUDIT_COLS + " FROM M_APPROVAL_ROUTE";
+    private static final String SELECT = "SELECT ROUTE_ID, COMPANY_DIV, DEPT_CD, APPROVAL_TYPE, ROUTE_NAME, VALID_FROM, VALID_TO, "
+            + "(SELECT d.DEPT_NAME FROM M_DEPARTMENT d WHERE d.COMPANY_DIV = M_APPROVAL_ROUTE.COMPANY_DIV AND d.DEPT_CD = M_APPROVAL_ROUTE.DEPT_CD) AS DEPT_NAME, " + AUDIT_COLS + " FROM M_APPROVAL_ROUTE";
     private static final String SELECT_STEP = "SELECT s.ROUTE_ID, s.STEP_NO, s.APPROVER_EMPLOYEE_ID, e.EMPLOYEE_NAME, e.DEPT_CD AS APPROVER_DEPT_CD, s.CREATED_AT, s.CREATED_BY, s.UPDATED_AT, s.UPDATED_BY, s.ROW_VERSION "
             + "FROM M_APPROVAL_ROUTE_STEP s JOIN M_EMPLOYEE e ON e.EMPLOYEE_ID = s.APPROVER_EMPLOYEE_ID";
 
@@ -20,6 +21,7 @@ public class ApprovalRouteDao extends AbstractDao {
         r.setRouteId(rs.getLong("ROUTE_ID"));
         r.setCompanyDiv(rs.getString("COMPANY_DIV"));
         r.setDeptCd(rs.getString("DEPT_CD"));
+        r.setDeptName(rs.getString("DEPT_NAME"));
         r.setApprovalType(rs.getString("APPROVAL_TYPE"));
         r.setRouteName(rs.getString("ROUTE_NAME"));
         r.setValidFrom(dt(rs, "VALID_FROM"));

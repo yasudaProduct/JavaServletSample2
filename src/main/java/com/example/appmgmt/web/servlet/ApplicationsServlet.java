@@ -62,7 +62,7 @@ public class ApplicationsServlet extends BaseServlet {
             return;
         }
         if (parts.size() == 1 && "new".equals(parts.get(0))) {
-            showInput(req, res, user, null, "new", ApplicationForm.bind(req), null);
+            showInput(req, res, user, null, "new", ApplicationForm.bind(req).withAssignment(user.getCompanyDiv(), user.getDeptCd(), user.getEmployeeId()), null);
             return;
         }
         Long id = parseId(parts.get(0));
@@ -425,6 +425,8 @@ public class ApplicationsServlet extends BaseServlet {
         req.setAttribute("mode", mode);
         req.setAttribute("form", form);
         req.setAttribute("errors", errors == null ? java.util.Map.of() : errors.getErrors());
+        // 担当（会社 > 部署 > 担当者）の選択肢。SC04 は入力中だけ開けるため、常に変更できる
+        req.setAttribute("assign", services().getApplicationQueryService().assignmentOptions());
         render(req, res, "emp/applications/input.jsp");
     }
 
@@ -467,16 +469,35 @@ public class ApplicationsServlet extends BaseServlet {
             additionalSource(req, user, sourceId);
         }
         Validation v = form.validate(toConfirm, false);
+        form.validateAssignment(v);
         if (v.hasErrors()) {
             showInput(req, res, user, d, mode, form, v);
             return;
         }
+        com.example.appmgmt.service.application.Assignment assignment = form.toAssignment();
         long id;
-        if (creating) {
-            id = services().getApplicationService().create(user, form.toVersion(), sourceId);
-        } else {
-            services().getApplicationService().saveDraft(applicationId, rowVersion(req), form.toVersion(), user);
-            id = applicationId;
+        try {
+            if (creating) {
+                id = services().getApplicationService().create(user, form.toVersion(), assignment, sourceId);
+            } else {
+                services().getApplicationService().saveDraft(applicationId, rowVersion(req), form.toVersion(), assignment, user);
+                id = applicationId;
+            }
+        } catch (BusinessException e) {
+            if ("E011".equals(e.getMessageId()) || "E012".equals(e.getMessageId())) {
+                String field = "E012".equals(e.getMessageId()) ? "ownerEmployeeId" : ("会社".equals(e.getArgs()[0]) ? "companyDiv" : "deptCd");
+                v.reject(field, e.getMessageId(), e.getArgs());
+                showInput(req, res, user, d, mode, form, v);
+                return;
+            }
+            throw e;
+        }
+        if (assignment.getOwnerEmployeeId() != user.getEmployeeId()) {
+            // 担当者を自分以外にした：以降の操作は担当者が行うため、入力した社員は一覧へ戻る
+            flashMessage(req, "success", "I020", services().getApplicationService().applicationNo(id),
+                    services().getApplicationService().employeeName(assignment.getOwnerEmployeeId()));
+            redirect(req, res, "/emp/applications");
+            return;
         }
         if (toConfirm) {
             redirect(req, res, "/emp/applications/" + id + "/confirm");

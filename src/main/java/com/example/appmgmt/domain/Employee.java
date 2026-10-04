@@ -7,6 +7,8 @@ public class Employee extends AuditedEntity {
     private String passwordHash;
     private String companyDiv;
     private String deptCd;
+    /** 表示用：部署名（M_DEPARTMENT） */
+    private String deptName;
     private String roleCd;
     private String mailAddress;
     private String validFlg;
@@ -23,6 +25,8 @@ public class Employee extends AuditedEntity {
     public void setCompanyDiv(String companyDiv) { this.companyDiv = companyDiv; }
     public String getDeptCd() { return deptCd; }
     public void setDeptCd(String deptCd) { this.deptCd = deptCd; }
+    public String getDeptName() { return deptName; }
+    public void setDeptName(String deptName) { this.deptName = deptName; }
     public String getRoleCd() { return roleCd; }
     public void setRoleCd(String roleCd) { this.roleCd = roleCd; }
     public String getMailAddress() { return mailAddress; }

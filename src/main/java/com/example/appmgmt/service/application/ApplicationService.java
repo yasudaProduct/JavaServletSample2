@@ -8,11 +8,16 @@ import com.example.appmgmt.common.TransitionNotAllowedException;
 import com.example.appmgmt.common.Tx;
 import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
+import com.example.appmgmt.dao.CompanyDivDao;
+import com.example.appmgmt.dao.DepartmentDao;
+import com.example.appmgmt.dao.EmployeeDao;
 import com.example.appmgmt.dao.ExternalLinkDao;
 import com.example.appmgmt.dao.StatusHistoryDao;
 import com.example.appmgmt.domain.Application;
 import com.example.appmgmt.domain.ApplicationVersion;
 import com.example.appmgmt.domain.Codes;
+import com.example.appmgmt.domain.Department;
+import com.example.appmgmt.domain.Employee;
 import com.example.appmgmt.domain.LoginUser;
 import com.example.appmgmt.domain.StatusCd;
 import com.example.appmgmt.domain.StatusHistory;
@@ -36,15 +41,52 @@ public class ApplicationService {
     private final ExternalLinkDao externalLinkDao;
     private final StatusTransitionService transitionService;
     private final ConsentIssuer consentIssuer;
+    private final CompanyDivDao companyDivDao;
+    private final DepartmentDao departmentDao;
+    private final EmployeeDao employeeDao;
 
     public ApplicationService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, StatusHistoryDao historyDao,
-                              ExternalLinkDao externalLinkDao, StatusTransitionService transitionService, ConsentIssuer consentIssuer) {
+                              ExternalLinkDao externalLinkDao, StatusTransitionService transitionService, ConsentIssuer consentIssuer,
+                              CompanyDivDao companyDivDao, DepartmentDao departmentDao, EmployeeDao employeeDao) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
         this.historyDao = historyDao;
         this.externalLinkDao = externalLinkDao;
         this.transitionService = transitionService;
         this.consentIssuer = consentIssuer;
+        this.companyDivDao = companyDivDao;
+        this.departmentDao = departmentDao;
+        this.employeeDao = employeeDao;
+    }
+
+    /**
+     * 担当（会社区分 > 部署 > 担当社員）の検証。会社区分が存在すること、部署がその会社区分の有効な部署であること、
+     * 担当社員がその会社区分の有効な担当者権限（01）の社員であること（部署は担当社員の所属と異なってよい）。
+     * 保存済みの値と同じ部署は、後から無効になっていても受け付ける。
+     */
+    private void validateAssignment(Connection conn, Assignment a, Assignment saved) {
+        if (a.getCompanyDiv() == null || companyDivDao.find(conn, a.getCompanyDiv()).isEmpty()) {
+            throw new BusinessException("E011", "会社");
+        }
+        boolean sameDept = saved != null && a.getCompanyDiv().equals(saved.getCompanyDiv()) && a.getDeptCd().equals(saved.getDeptCd());
+        Department d = departmentDao.find(conn, a.getCompanyDiv(), a.getDeptCd()).orElse(null);
+        if (d == null || (!d.isValid() && !sameDept)) {
+            throw new BusinessException("E011", "部署");
+        }
+        Employee e = employeeDao.findById(conn, a.getOwnerEmployeeId()).orElse(null);
+        if (e == null || !e.isValid() || !Codes.ROLE_OWNER.equals(e.getRoleCd()) || !e.getCompanyDiv().equals(a.getCompanyDiv())) {
+            throw new BusinessException("E012");
+        }
+    }
+
+    /** 担当社員の氏名（保存後のメッセージ用）。 */
+    public String employeeName(long employeeId) {
+        return Tx.execute(conn -> employeeDao.findById(conn, employeeId).map(Employee::getEmployeeName).orElse(""));
+    }
+
+    /** 申込番号（担当者を自分以外にして保存したときの案内用。保存後は入力した社員が申込を参照できないため、参照権限を確認せずに引く）。 */
+    public String applicationNo(long applicationId) {
+        return Tx.execute(conn -> applicationDao.findById(conn, applicationId).map(Application::getApplicationNo).orElse(""));
     }
 
     private Application load(Connection conn, long applicationId, int expectedRowVersion, LoginUser user, Set<String> allowedStatuses) {
@@ -73,8 +115,9 @@ public class ApplicationService {
      * 新規申込は同じ氏名・メールアドレスでも別の申込者として扱い、申込者アカウントは一次承認が通ったときに新しく発行して紐づける。
      * 追加申込（同じ申込者の新しい申込）は元の申込が審査完了（10701／20701）のときだけ作れ、元の申込のアカウントを引き継ぐ。
      * 申込者情報・申込内容は画面で複写した値を初期値にした別データ（元の申込とは独立）。
+     * 担当（会社区分・部署・担当社員）は入力値（未指定ならログインユーザーの値）。担当社員を自分以外にした場合、保存後の操作は担当社員が行う。
      */
-    public long create(LoginUser user, ApplicationVersion content, Long sourceApplicationId) {
+    public long create(LoginUser user, ApplicationVersion content, Assignment assignment, Long sourceApplicationId) {
         if (!user.isOwner()) {
             throw new ForbiddenException();
         }
@@ -90,12 +133,14 @@ public class ApplicationService {
                 }
                 accountId = src.getApplicantId();
             }
+            Assignment a = assignment == null ? Assignment.of(user) : assignment;
+            validateAssignment(conn, a, null);
             Application app = new Application();
             app.setApplicationNo(applicationDao.nextApplicationNo(conn));
             app.setApplicantId(accountId);
-            app.setOwnerEmployeeId(user.getEmployeeId());
-            app.setCompanyDiv(user.getCompanyDiv());
-            app.setDeptCd(user.getDeptCd());
+            app.setOwnerEmployeeId(a.getOwnerEmployeeId());
+            app.setCompanyDiv(a.getCompanyDiv());
+            app.setDeptCd(a.getDeptCd());
             app.setStatusCd(StatusCd.INPUT);
             app.setCurrentVersionNo(1);
             app.setRegistrationType(sourceApplicationId == null ? Codes.REG_SCREEN : Codes.REG_ADDITIONAL);
@@ -103,6 +148,7 @@ public class ApplicationService {
             long id = applicationDao.insert(conn, app);
 
             ApplicationVersion v = content.copyContent();
+            v.applyAssignmentFrom(a.getCompanyDiv(), a.getDeptCd(), a.getOwnerEmployeeId());
             v.setApplicationId(id);
             v.setVersionNo(1);
             v.setVersionType(Codes.VERSION_NEW);
@@ -125,9 +171,28 @@ public class ApplicationService {
 
     /** 一時保存（10101／20101）。現行版（申込者情報を含む申込内容）をそのまま更新する。遷移・履歴なし。 */
     public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, LoginUser user) {
+        saveDraft(applicationId, rowVersion, content, null, user);
+    }
+
+    /**
+     * 一時保存。assignment を渡すと担当（会社区分・部署・担当社員）も変更する（入力中 10101 のみ。契約変更の入力中は変更できない）。
+     * 申込と現行版の両方に記録する。
+     */
+    public void saveDraft(long applicationId, int rowVersion, ApplicationVersion content, Assignment assignment, LoginUser user) {
         Tx.executeVoid(conn -> {
             Application app = load(conn, applicationId, rowVersion, user, Set.of(StatusCd.INPUT, StatusCd.CHG_INPUT));
             ApplicationVersion v = versionDao.get(conn, applicationId, app.getCurrentVersionNo());
+            if (assignment != null) {
+                if (!StatusCd.INPUT.equals(app.getStatusCd())) {
+                    throw new TransitionNotAllowedException();
+                }
+                Assignment saved = Assignment.of(app);
+                if (!assignment.sameAs(saved)) {
+                    validateAssignment(conn, assignment, saved);
+                    applicationDao.updateAssignment(conn, applicationId, assignment.getCompanyDiv(), assignment.getDeptCd(), assignment.getOwnerEmployeeId());
+                }
+                versionDao.updateAssignment(conn, applicationId, v.getVersionNo(), assignment.getCompanyDiv(), assignment.getDeptCd(), assignment.getOwnerEmployeeId());
+            }
             applyContent(v, content);
             v.setAmountRatio(null);
             versionDao.updateContent(conn, v);

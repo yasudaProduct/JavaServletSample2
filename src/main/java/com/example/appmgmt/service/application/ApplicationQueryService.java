@@ -8,6 +8,7 @@ import com.example.appmgmt.dao.ApplicationDao;
 import com.example.appmgmt.dao.ApplicationVersionDao;
 import com.example.appmgmt.dao.ApprovalRequestDao;
 import com.example.appmgmt.dao.CompanyDivDao;
+import com.example.appmgmt.dao.DepartmentDao;
 import com.example.appmgmt.dao.EmployeeDao;
 import com.example.appmgmt.dao.ExternalLinkDao;
 import com.example.appmgmt.dao.StatusDao;
@@ -27,6 +28,7 @@ import com.example.appmgmt.domain.Status;
 import com.example.appmgmt.domain.StatusCd;
 import com.example.appmgmt.domain.StatusHistory;
 import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,10 +47,11 @@ public class ApplicationQueryService {
     private final ExternalLinkDao externalLinkDao;
     private final StatusHistoryDao historyDao;
     private final StatusTransitionDao transitionDao;
+    private final DepartmentDao departmentDao;
 
     public ApplicationQueryService(ApplicationDao applicationDao, ApplicationVersionDao versionDao, ApplicantAccountDao accountDao, EmployeeDao employeeDao, StatusDao statusDao,
                                    CompanyDivDao companyDivDao, ApprovalRequestDao approvalRequestDao, ApplicantConsentDao consentDao, ExternalLinkDao externalLinkDao, StatusHistoryDao historyDao,
-                                   StatusTransitionDao transitionDao) {
+                                   StatusTransitionDao transitionDao, DepartmentDao departmentDao) {
         this.applicationDao = applicationDao;
         this.versionDao = versionDao;
         this.accountDao = accountDao;
@@ -60,6 +63,20 @@ public class ApplicationQueryService {
         this.externalLinkDao = externalLinkDao;
         this.historyDao = historyDao;
         this.transitionDao = transitionDao;
+        this.departmentDao = departmentDao;
+    }
+
+    /** 申込入力の担当（会社 > 部署 > 担当者）の選択肢。 */
+    public AssignmentOptions assignmentOptions() {
+        return Tx.execute(conn -> {
+            List<Employee> owners = new ArrayList<>();
+            for (Employee e : employeeDao.findValid(conn)) {
+                if (Codes.ROLE_OWNER.equals(e.getRoleCd())) {
+                    owners.add(e);
+                }
+            }
+            return new AssignmentOptions(companyDivDao.findAll(conn), departmentDao.findValid(conn), owners);
+        });
     }
 
     public static class SearchResult {
@@ -143,6 +160,7 @@ public class ApplicationQueryService {
         d.setOwner(employeeDao.findById(conn, app.getOwnerEmployeeId()).orElse(null));
         d.setStatus(statusDao.find(conn, app.getStatusCd()).orElse(null));
         d.setCompanyDiv(companyDivDao.find(conn, app.getCompanyDiv()).orElse(null));
+        d.setDepartment(departmentDao.find(conn, app.getCompanyDiv(), app.getDeptCd()).orElse(null));
         d.setCurrentVersion(versionDao.get(conn, applicationId, app.getCurrentVersionNo()));
         // 申込者情報は申込データ（現行版）、ログイン用のデータは申込者アカウント（一次承認で発行するまで null）
         d.setAccount(app.getApplicantId() == null ? null : accountDao.findById(conn, app.getApplicantId()).orElse(null));

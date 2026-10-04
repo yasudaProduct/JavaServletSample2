@@ -5,7 +5,7 @@
 <%@ include file="/WEB-INF/views/common/emp_top.jspf" %>
 <script>document.body.setAttribute('data-base-total', '${empty base ? '' : base.totalAmount}'); document.body.setAttribute('data-ratio-limit', '${ratioLimit}');</script>
 <div class="card mb-3"><div class="card-body py-2 small">
-  <strong>申込番号：</strong><c:out value="${a.applicationNo}"/>　<strong>ステータス：</strong><c:out value="${d.status.displayName}"/>　<strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　
+  <strong>申込番号：</strong><c:out value="${a.applicationNo}"/>　<strong>ステータス：</strong><c:out value="${d.status.displayName}"/>　<strong>担当：</strong><span id="assignHead" title="担当（会社・部署・担当者）は申込入力中だけ変更できます"><c:out value="${d.companyDiv.companyDivName}"/> ／ <c:out value="${empty d.department ? a.deptCd : d.department.deptName}"/> ／ <c:out value="${d.owner.employeeName}"/></span>　
   <strong>申込者：</strong><c:out value="${d.applicant.applicantName}"/>（<c:out value="${empty d.applicant.applicantNo ? 'アカウント未発行' : d.applicant.applicantNo}"/>）<br>
   <strong>版：</strong>第 ${d.currentVersion.versionNo} 版（<c:out value="${d.currentVersion.versionTypeName}"/>、複写元 第 ${d.currentVersion.copiedFromVersionNo} 版）　<strong>変更前（審査完了版）：</strong>第 ${base.versionNo} 版　申込金額合計 ${app:amount(base.totalAmount)} 円　しきい値 ${app:ratio(ratioLimit)} 倍
 </div></div>

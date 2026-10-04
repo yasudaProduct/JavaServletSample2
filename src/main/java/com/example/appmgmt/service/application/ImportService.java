@@ -187,6 +187,8 @@ public class ImportService {
                 long appId = applicationDao.insert(conn, app);
                 v.setApplicationId(appId);
                 v.setVersionNo(1);
+                // 担当は取込社員の会社区分・部署・本人（取込後に申込入力で変更できる）
+                v.applyAssignmentFrom(user.getCompanyDiv(), user.getDeptCd(), user.getEmployeeId());
                 v.setVersionType(Codes.VERSION_NEW);
                 v.setFixedFlg(Codes.FLG_OFF);
                 v.setCanceledFlg(Codes.FLG_OFF);

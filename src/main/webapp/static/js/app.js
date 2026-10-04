@@ -57,10 +57,43 @@
     });
   });
 
-  // 二重送信防止
+  // 会社 > 部署（> 担当者）の連動選択：data-company-source で指定した会社の選択に合う選択肢だけを出す（SC04、SC11、SC13）
+  document.querySelectorAll('select[data-company-source]').forEach(function (sel) {
+    var src = document.getElementById(sel.getAttribute('data-company-source'));
+    if (!src) { return; }
+    var apply = function () {
+      var first = null;
+      Array.prototype.forEach.call(sel.options, function (o) {
+        var ok = o.getAttribute('data-company') === src.value;
+        o.hidden = !ok;
+        o.disabled = !ok;
+        if (ok && first === null) { first = o; }
+      });
+      var cur = sel.options[sel.selectedIndex];
+      if (!cur || cur.disabled) { sel.value = first ? first.value : ''; }
+    };
+    src.addEventListener('change', apply);
+    apply();
+  });
+
+  // SC04：担当者を自分以外にする保存は確認する（保存後は担当者だけが操作できる）
+  var assignOwner = document.getElementById('ownerEmployeeId');
+  if (assignOwner && assignOwner.form && assignOwner.form.hasAttribute('data-user-id')) {
+    assignOwner.form.addEventListener('submit', function (e) {
+      if (assignOwner.value && assignOwner.value !== assignOwner.form.getAttribute('data-user-id')) {
+        var name = assignOwner.options[assignOwner.selectedIndex].text.replace(/（.*$/, '');
+        if (!window.confirm('担当者を「' + name + '」にします。保存後、この申込は担当者だけが操作でき、あなたは開けなくなります。よろしいですか？')) {
+          e.preventDefault();
+        }
+      }
+    });
+  }
+
+  // 二重送信防止（確認ダイアログで取り消した送信は対象外）
   document.querySelectorAll('form').forEach(function (f) {
-    f.addEventListener('submit', function () {
+    f.addEventListener('submit', function (ev) {
       window.setTimeout(function () {
+        if (ev.defaultPrevented) { return; }
         f.querySelectorAll('button[type=submit]').forEach(function (b) { b.disabled = true; });
       }, 0);
     });

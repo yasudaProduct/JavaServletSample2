@@ -10,8 +10,12 @@ import javax.servlet.http.HttpServletRequest;
 /**
  * 申込内容の入力フォーム（SC04／SC07／SC08／AP02 共通）。入力値は文字列で保持し、チェック後に版へ変換する。
  * 申込者情報（申込者名・カナ・電話番号・メールアドレス・住所）も申込データとしてここで扱う。
+ * 担当（会社区分・部署・担当社員）は SC04 の入力中だけ扱う（存在・組合せの検証はサービス層）。
  */
 public class ApplicationForm {
+    private String companyDiv = "";
+    private String deptCd = "";
+    private String ownerEmployeeId = "";
     private String applicantName = "";
     private String applicantKana = "";
     private String telNo = "";
@@ -27,6 +31,9 @@ public class ApplicationForm {
 
     public static ApplicationForm bind(HttpServletRequest req) {
         ApplicationForm f = new ApplicationForm();
+        f.companyDiv = p(req, "companyDiv");
+        f.deptCd = p(req, "deptCd");
+        f.ownerEmployeeId = p(req, "ownerEmployeeId");
         f.applicantName = p(req, "applicantName");
         f.applicantKana = p(req, "applicantKana");
         f.telNo = p(req, "telNo");
@@ -56,6 +63,9 @@ public class ApplicationForm {
         if (v == null) {
             return f;
         }
+        f.companyDiv = n(v.getCompanyDiv());
+        f.deptCd = n(v.getDeptCd());
+        f.ownerEmployeeId = v.getOwnerEmployeeId() == null ? "" : String.valueOf(v.getOwnerEmployeeId());
         f.applicantName = n(v.getApplicantName());
         f.applicantKana = n(v.getApplicantKana());
         f.telNo = n(v.getTelNo());
@@ -69,6 +79,33 @@ public class ApplicationForm {
         f.contractEndDate = Formats.date(v.getContractEndDate());
         f.remarks = n(v.getRemarks());
         return f;
+    }
+
+    /** 担当の初期値（ログインユーザーの会社区分・部署と本人）。 */
+    public ApplicationForm withAssignment(String companyDiv, String deptCd, long ownerEmployeeId) {
+        this.companyDiv = n(companyDiv);
+        this.deptCd = n(deptCd);
+        this.ownerEmployeeId = String.valueOf(ownerEmployeeId);
+        return this;
+    }
+
+    /** 担当（会社・部署・担当者）の必須チェック。SC04 の保存時だけ呼ぶ。 */
+    public void validateAssignment(Validation v) {
+        if (companyDiv.isEmpty()) {
+            v.reject("companyDiv", "E001", "会社");
+        }
+        if (deptCd.isEmpty()) {
+            v.reject("deptCd", "E001", "部署");
+        }
+        if (ownerEmployeeId.isEmpty()) {
+            v.reject("ownerEmployeeId", "E001", "担当者");
+        } else if (!ownerEmployeeId.matches("[0-9]{1,18}")) {
+            v.reject("ownerEmployeeId", "E011", "担当者");
+        }
+    }
+
+    public com.example.appmgmt.service.application.Assignment toAssignment() {
+        return new com.example.appmgmt.service.application.Assignment(companyDiv, deptCd, Long.parseLong(ownerEmployeeId));
     }
 
     /**
@@ -210,6 +247,9 @@ public class ApplicationForm {
         return v;
     }
 
+    public String getCompanyDiv() { return companyDiv; }
+    public String getDeptCd() { return deptCd; }
+    public String getOwnerEmployeeId() { return ownerEmployeeId; }
     public String getApplicantName() { return applicantName; }
     public String getApplicantKana() { return applicantKana; }
     public String getTelNo() { return telNo; }

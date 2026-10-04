@@ -83,6 +83,12 @@ public class ApplicationDao extends AbstractDao {
                 a.getCurrentVersionNo(), a.getBaseVersionNo(), a.getReviewedVersionNo(), a.getReviewedAt(), now(), actor(), a.getApplicationId());
     }
 
+    /** 担当（会社区分・部署・担当社員）の更新。申込入力（SC04、入力中）の保存と同じトランザクションで行い、行バージョンは touch で進める。 */
+    public void updateAssignment(Connection conn, long applicationId, String companyDiv, String deptCd, long ownerEmployeeId) {
+        update(conn, "UPDATE T_APPLICATION SET COMPANY_DIV = ?, DEPT_CD = ?, OWNER_EMPLOYEE_ID = ?, UPDATED_AT = ?, UPDATED_BY = ? WHERE APPLICATION_ID = ?",
+                companyDiv, deptCd, ownerEmployeeId, now(), actor(), applicationId);
+    }
+
     /** 申込内容の一時保存など、ステータスを変えない更新で行バージョンだけ進める。 */
     public int touch(Connection conn, long applicationId, int expectedRowVersion) {
         return update(conn, "UPDATE T_APPLICATION SET UPDATED_AT = ?, UPDATED_BY = ?, ROW_VERSION = ROW_VERSION + 1 WHERE APPLICATION_ID = ? AND ROW_VERSION = ?",

@@ -147,6 +147,13 @@ async function approve(page, appId, action, comment = '') {
   await page.click(`button[value=${action}]`); await page.waitForLoadState('networkidle');
   console.log('    ' + action + ':', (await alerts(page)).slice(0, 60));
 }
+// SC16 部署マスタに部署を追加する
+async function addDepartment(page, companyDiv, deptCd, deptName) {
+  await page.goto(BASE + '/emp/master/departments');
+  await page.selectOption('#newDepartment [name=companyDiv]', companyDiv); await page.fill('#newDepartment [name=deptCd]', deptCd); await page.fill('#newDepartment [name=deptName]', deptName);
+  await page.click('#newDepartment button[type=submit]'); await page.waitForLoadState('networkidle');
+  if (!(await alerts(page)).includes('登録しました') || await page.locator(`#departmentTable input[name=deptName][value="${deptName}"]`).count() !== 1) throw new Error('SC16: add department failed ' + deptCd);
+}
 // 申込者ポータル（別のブラウザコンテキスト）
 async function portalLogin(apPage, id, pw) {
   await apPage.goto(BASE + '/my/login');
@@ -269,7 +276,7 @@ async function portalLogin(apPage, id, pw) {
     await applicantConsent(ctx, url3, {});
     await page.goto(BASE + '/emp/applications/' + a.appId); await expectStatus(page, '10501', '再同意（トークン）');
     // 最終承認：テンプレートと逆順（二郎 → 一郎）で申請し、次回の初期値が前回の回付先になることを確認する
-    await applyApproval(page, a.appId, { approvers: ['会社A 承認 二郎（100）', '会社A 承認 一郎（100）'] }); await expectStatus(page, '10502', '最終承認申請（逆順の回付先）');
+    await applyApproval(page, a.appId, { approvers: ['会社A 承認 二郎（営業部）', '会社A 承認 一郎（営業部）'] }); await expectStatus(page, '10502', '最終承認申請（逆順の回付先）');
     await logout(page);
     await login(page, 'A003'); await approve(page, a.appId, 'approve'); await expectStatus(page, '10502', '最終承認 ステップ1 承認（遷移なし）'); await logout(page);
     await login(page, 'A002'); await approve(page, a.appId, 'review'); await expectStatus(page, '10601', '審査申請');
@@ -374,6 +381,62 @@ async function portalLogin(apPage, id, pw) {
     if (await page.locator('#tile-additional.tile-disabled').count() !== 1) throw new Error('90101: 追加申込 should be disabled');
     await logout(page);
 
+    // ---------- 担当（申込受付会社の会社 > 部署 > 担当者）：部署マスタ（SC16）と、担当者を自分以外にした申込 ----------
+    await login(page, 'A009');
+    await addDepartment(page, '1', '110', '営業第二部');
+    await addDepartment(page, '2', '210', '法人営業部');
+    await page.selectOption('#newDepartment [name=companyDiv]', '1'); await page.fill('#newDepartment [name=deptCd]', '110'); await page.fill('#newDepartment [name=deptName]', '重複');
+    await page.click('#newDepartment button[type=submit]'); await page.waitForLoadState('networkidle');
+    if (!(await page.locator('.invalid-feedback:visible').allTextContents()).join().includes('すでに登録')) throw new Error('SC16: duplicate department code should be rejected');
+    await page.goto(BASE + '/emp/master/departments'); await shot(page, 'SC16');
+    // 社員の所属部署は部署マスタから選ぶ（会社で絞り込み）
+    await page.goto(BASE + '/emp/master/employees/new');
+    await page.fill('[name=employeeNo]', 'A004'); await page.fill('[name=employeeName]', '会社A 担当 四葉'); await page.fill('[name=password]', 'password');
+    await page.selectOption('#companyDiv', '2');
+    if ((await page.locator('#deptCd option:not([disabled])').allTextContents()).join() !== '営業部（200）,法人営業部（210）') throw new Error('SC11: departments should be filtered by company');
+    await page.selectOption('#companyDiv', '1'); await page.selectOption('#deptCd', '110'); await page.selectOption('[name=roleCd]', '01');
+    await page.fill('[name=mailAddress]', 'a004@example.com'); await page.check('#validFlg');
+    await page.click('button:has-text("保存")'); await page.waitForURL('**/emp/master/employees');
+    if (!(await page.locator('tr', { hasText: 'A004' }).textContent()).includes('営業第二部（110）')) throw new Error('SC11: A004 should belong to 営業第二部');
+    console.log('OK  SC16 部署マスタ：部署を追加（重複は E006）、社員の部署は会社で絞り込んだ部署マスタから選択');
+    await logout(page);
+    // 担当者 A001 が、担当部署を 営業第二部、担当者を A004 にして新規申込を保存する（確認ダイアログ → I020 → 一覧へ。以降は A004 だけが操作できる）
+    await login(page, 'A001');
+    await page.goto(BASE + '/emp/applications/new');
+    const defaults = [await page.inputValue('#companyDiv'), await page.inputValue('#deptCd'), await page.locator('#ownerEmployeeId option:checked').textContent()];
+    if (defaults[0] !== '1' || defaults[1] !== '100' || !defaults[2].includes('会社A 担当 太郎')) throw new Error('SC04: assignment should default to the login user, got ' + defaults.join(' / '));
+    await fillApplicant(page, { name: '伊藤 さくら', kana: 'イトウ サクラ', mail: 'sakura.ito@example.com' }); await page.fill('#productCd', 'PRD001');
+    await page.fill('#basicFee', '600000'); await page.fill('#optionFee', '0'); await page.fill('#handlingFee', '0');
+    await page.selectOption('#deptCd', '110'); await page.selectOption('#ownerEmployeeId', { label: '会社A 担当 四葉（営業第二部）' });
+    await page.locator('#assignCard').scrollIntoViewIfNeeded(); await shot(page, 'SC04-assign');
+    let dialogText = '';
+    page.once('dialog', d => { dialogText = d.message(); d.accept(); });
+    await page.click('button[value=save]'); await page.waitForURL('**/emp/applications');
+    if (!dialogText.includes('会社A 担当 四葉')) throw new Error('SC04: confirm dialog expected when the owner is someone else, got ' + dialogText);
+    const handOver = await alerts(page);
+    const d4No = (handOver.match(/AP\d{10}/) || [])[0];
+    if (!d4No || !handOver.includes('会社A 担当 四葉 さん')) throw new Error('I020 expected, got ' + handOver);
+    if (await page.locator('a', { hasText: d4No }).count() !== 0) throw new Error('the inputter should no longer see the application in the list');
+    console.log('OK  担当者を自分以外にして保存：確認ダイアログ → ' + handOver.slice(0, 60));
+    await logout(page);
+    await login(page, 'A004');
+    await page.goto(BASE + '/emp/applications?search=1');
+    const d4Href = await page.locator('a', { hasText: d4No }).getAttribute('href');
+    const d4 = { appId: d4Href.split('/').slice(-2)[0], appNo: d4No };
+    await page.goto(BASE + '/emp/applications/' + d4.appId + '/menu'); await expectStatus(page, '10101', '担当者 A004 の申込（入力中）');
+    if ((await page.locator('#assignHead').textContent()).replace(/\s+/g, ' ').trim() !== '会社A ／ 営業第二部 ／ 会社A 担当 四葉') throw new Error('SC14 assignment header: ' + await page.locator('#assignHead').textContent());
+    await page.goto(BASE + '/emp/applications/' + d4.appId + '/edit');
+    await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    const assignRows = (await page.locator('.version-table tr', { hasText: '部署' }).first().textContent()).replace(/\s+/g, ' ');
+    if (!assignRows.includes('営業第二部（110）')) throw new Error('SC05 should show the assigned department: ' + assignRows);
+    await page.click('button[value=confirm]'); await page.waitForLoadState('networkidle'); await expectStatus(page, '10201', '担当者 A004 が確定');
+    await logout(page);
+    await login(page, 'A001');
+    await page.goto(BASE + '/emp/applications/' + d4.appId + '/menu');
+    if (page.url().includes('/' + d4.appId + '/') || !(await alerts(page)).includes('権限')) throw new Error('A001 should not be able to open the application owned by A004: ' + page.url() + ' ' + await alerts(page));
+    console.log('OK  担当者 A004 が操作（10101 → 10201）、入力した A001 は開けない（' + (await alerts(page)).slice(0, 40) + '）');
+    await logout(page);
+
     // ---------- 会社B（事前確認あり）----------
     await login(page, 'B001');
     const b = await createApplication(page, { name: '佐藤 次郎', kana: 'サトウ ジロウ', mail: 'jiro.sato@example.com', tel: '06-0000-0003', address: '大阪府大阪市北区梅田3-3-3' }, '3000000', '0');
@@ -398,9 +461,13 @@ async function portalLogin(apPage, id, pw) {
     await page.goto(BASE + '/emp/applications/' + b.appId + '/edit');
     // アカウント発行後も申込者情報は申込データとして全体修正で変更できる（アカウントは紐づいたまま）
     if (await page.locator('#applicantName').count() !== 1 || !(await page.locator('#accountNote').textContent()).includes(b.applicantNo)) throw new Error('applicant data should be editable as application data');
-    await page.fill('#address', '大阪府大阪市北区梅田9-9-9'); await page.fill('#remarks', '全体修正で備考を変更'); await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
+    await page.fill('#address', '大阪府大阪市北区梅田9-9-9'); await page.fill('#remarks', '全体修正で備考を変更');
+    // 担当部署も入力中（全体修正後の再入力）なら変えられる
+    await page.selectOption('#deptCd', '210');
+    await page.click('button[value=confirm]'); await page.waitForURL('**/confirm');
     const changedCells = await page.locator('td.changed').count();
-    if (changedCells < 2) throw new Error('full revise: changed applicant address and remarks should be red, got ' + changedCells);
+    if (changedCells < 3) throw new Error('full revise: changed department, applicant address and remarks should be red, got ' + changedCells);
+    if (!(await page.locator('td.changed', { hasText: '法人営業部（210）' }).count())) throw new Error('full revise: the changed department should be red');
     console.log('OK  全体修正の変更項目を赤字表示: ' + changedCells + ' 項目'); await shot(page, 'SC05-fullrevise-diff');
     await page.click('button[value=confirm]'); await page.waitForLoadState('networkidle'); await expectStatus(page, '10201', 'B 再確定');
     await applyApproval(page, b.appId, { approvers: [] }); await expectStatus(page, '10301', 'B 回付先なし 2');

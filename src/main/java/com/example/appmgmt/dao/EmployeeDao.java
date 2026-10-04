@@ -10,7 +10,8 @@ import java.util.Optional;
 
 public class EmployeeDao extends AbstractDao {
 
-    private static final String SELECT = "SELECT EMPLOYEE_ID, EMPLOYEE_NO, EMPLOYEE_NAME, PASSWORD_HASH, COMPANY_DIV, DEPT_CD, ROLE_CD, MAIL_ADDRESS, VALID_FLG, " + AUDIT_COLS + " FROM M_EMPLOYEE";
+    private static final String SELECT = "SELECT EMPLOYEE_ID, EMPLOYEE_NO, EMPLOYEE_NAME, PASSWORD_HASH, COMPANY_DIV, DEPT_CD, ROLE_CD, MAIL_ADDRESS, VALID_FLG, "
+            + "(SELECT d.DEPT_NAME FROM M_DEPARTMENT d WHERE d.COMPANY_DIV = M_EMPLOYEE.COMPANY_DIV AND d.DEPT_CD = M_EMPLOYEE.DEPT_CD) AS DEPT_NAME, " + AUDIT_COLS + " FROM M_EMPLOYEE";
 
     static Employee map(ResultSet rs) throws SQLException {
         Employee e = new Employee();
@@ -20,6 +21,7 @@ public class EmployeeDao extends AbstractDao {
         e.setPasswordHash(rs.getString("PASSWORD_HASH"));
         e.setCompanyDiv(rs.getString("COMPANY_DIV"));
         e.setDeptCd(rs.getString("DEPT_CD"));
+        e.setDeptName(rs.getString("DEPT_NAME"));
         e.setRoleCd(rs.getString("ROLE_CD"));
         e.setMailAddress(rs.getString("MAIL_ADDRESS"));
         e.setValidFlg(rs.getString("VALID_FLG"));

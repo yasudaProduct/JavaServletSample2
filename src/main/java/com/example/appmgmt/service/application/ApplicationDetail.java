@@ -23,6 +23,7 @@ public class ApplicationDetail {
     private Employee owner;
     private Status status;
     private CompanyDiv companyDiv;
+    private com.example.appmgmt.domain.Department department;
     private ApplicationVersion currentVersion;
     private ApplicationVersion baseVersion;
     private ApplicationVersion reviewedVersion;
@@ -49,6 +50,9 @@ public class ApplicationDetail {
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
     public CompanyDiv getCompanyDiv() { return companyDiv; }
+    /** 申込の担当部署（M_DEPARTMENT）。 */
+    public com.example.appmgmt.domain.Department getDepartment() { return department; }
+    public void setDepartment(com.example.appmgmt.domain.Department department) { this.department = department; }
     public void setCompanyDiv(CompanyDiv companyDiv) { this.companyDiv = companyDiv; }
     public ApplicationVersion getCurrentVersion() { return currentVersion; }
     public void setCurrentVersion(ApplicationVersion currentVersion) { this.currentVersion = currentVersion; }

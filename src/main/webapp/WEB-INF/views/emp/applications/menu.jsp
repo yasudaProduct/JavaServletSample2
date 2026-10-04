@@ -10,8 +10,7 @@
         <div class="small text-muted"><c:out value="${d.status.description}"/></div>
         <div class="small mt-1">
           <strong>申込者：</strong><c:out value="${d.applicant.applicantName}"/>（<c:out value="${empty d.applicant.applicantNo ? 'アカウント未発行' : d.applicant.applicantNo}"/>）　
-          <strong>担当社員：</strong><c:out value="${d.owner.employeeName}"/>　
-          <strong>会社区分：</strong><c:out value="${d.companyDiv.companyDivName}"/>　
+          <strong>担当：</strong><span id="assignHead"><c:out value="${d.companyDiv.companyDivName}"/> ／ <c:out value="${empty d.department ? a.deptCd : d.department.deptName}"/> ／ <c:out value="${d.owner.employeeName}"/></span>　
           <strong>現行版：</strong>第 ${a.currentVersionNo} 版（<c:out value="${d.currentVersion.versionTypeName}"/>）　
           <strong>申込金額合計：</strong>${app:amount(d.currentVersion.totalAmount)} 円　
           <strong>更新日時：</strong>${app:datetime(a.updatedAt)}

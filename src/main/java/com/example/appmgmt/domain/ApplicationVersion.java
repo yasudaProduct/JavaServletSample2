@@ -28,6 +28,33 @@ public class ApplicationVersion extends AuditedEntity {
     private LocalDateTime confirmedAt;
     private String fixedFlg;
     private String canceledFlg;
+    /** 担当（申込受付会社側の会社区分・部署・担当社員）。申込（T_APPLICATION）の値と同じものを版にも記録する。入力中だけ変更できる。 */
+    private String companyDiv;
+    private String deptCd;
+    private Long ownerEmployeeId;
+    /** 表示用（会社区分名・部署名・担当社員名）。 */
+    private String companyDivName;
+    private String deptName;
+    private String ownerName;
+
+    public String getCompanyDiv() { return companyDiv; }
+    public void setCompanyDiv(String companyDiv) { this.companyDiv = companyDiv; }
+    public String getDeptCd() { return deptCd; }
+    public void setDeptCd(String deptCd) { this.deptCd = deptCd; }
+    public Long getOwnerEmployeeId() { return ownerEmployeeId; }
+    public void setOwnerEmployeeId(Long ownerEmployeeId) { this.ownerEmployeeId = ownerEmployeeId; }
+    public String getCompanyDivName() { return companyDivName; }
+    public void setCompanyDivName(String companyDivName) { this.companyDivName = companyDivName; }
+    public String getDeptName() { return deptName; }
+    public void setDeptName(String deptName) { this.deptName = deptName; }
+    public String getOwnerName() { return ownerName; }
+    public void setOwnerName(String ownerName) { this.ownerName = ownerName; }
+    /** 担当（会社区分・部署・担当社員）を写す。 */
+    public void applyAssignmentFrom(String companyDiv, String deptCd, Long ownerEmployeeId) {
+        this.companyDiv = companyDiv;
+        this.deptCd = deptCd;
+        this.ownerEmployeeId = ownerEmployeeId;
+    }
 
     public long getApplicationId() { return applicationId; }
     public void setApplicationId(long applicationId) { this.applicationId = applicationId; }
@@ -154,6 +181,9 @@ public class ApplicationVersion extends AuditedEntity {
         v.contractStartDate = contractStartDate;
         v.contractEndDate = contractEndDate;
         v.remarks = remarks;
+        v.companyDiv = companyDiv;
+        v.deptCd = deptCd;
+        v.ownerEmployeeId = ownerEmployeeId;
         return v;
     }
 }

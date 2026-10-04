@@ -19,8 +19,8 @@
     <h3 class="h6 section-title">申込基本情報</h3>
     <table class="table table-sm table-bordered">
       <tr><th style="width: 30%;">申込者</th><td><c:out value="${d.applicant.applicantName}"/>（<c:out value="${d.applicant.mailAddress}"/>）　申込者アカウント：<c:out value="${empty d.applicant.applicantNo ? '未発行' : d.applicant.applicantNo}"/></td></tr>
-      <tr><th>担当社員</th><td><c:out value="${d.owner.employeeName}"/></td></tr>
-      <tr><th>会社区分／部署コード</th><td><c:out value="${d.companyDiv.companyDivName}"/>（事前確認${d.companyDiv.preCheck ? 'あり' : 'なし'}、しきい値 ${app:ratio(d.companyDiv.amountRatioLimit)} 倍）／<c:out value="${a.deptCd}"/></td></tr>
+      <tr><th>担当者</th><td><c:out value="${d.owner.employeeName}"/></td></tr>
+      <tr><th>会社／部署</th><td><c:out value="${d.companyDiv.companyDivName}"/>（事前確認${d.companyDiv.preCheck ? 'あり' : 'なし'}、しきい値 ${app:ratio(d.companyDiv.amountRatioLimit)} 倍）／<c:out value="${empty d.department ? '' : d.department.deptName}"/>（<c:out value="${a.deptCd}"/>）</td></tr>
       <tr><th>登録区分</th><td>${app:label('REGISTRATION_TYPE', a.registrationType)}
         <c:if test="${not empty d.sourceApplicationNo}">（元の申込 <a href="${ctx}/emp/applications/${a.sourceApplicationId}"><c:out value="${d.sourceApplicationNo}"/></a>）</c:if>
         <c:if test="${not empty a.importBatchId}">（取込 ID <a href="${ctx}/emp/import/${a.importBatchId}">${a.importBatchId}</a>）</c:if></td></tr>

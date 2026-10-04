@@ -7,6 +7,7 @@ import com.example.appmgmt.domain.ApprovalRoute;
 import com.example.appmgmt.domain.ApprovalRouteStep;
 import com.example.appmgmt.domain.Codes;
 import com.example.appmgmt.domain.CompanyDiv;
+import com.example.appmgmt.domain.Department;
 import com.example.appmgmt.domain.Employee;
 import com.example.appmgmt.domain.LoginUser;
 import java.io.IOException;
@@ -18,7 +19,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-/** SC11 社員マスタ、SC12 会社区分マスタ、SC13 承認ルートマスタ（F15）。 */
+/** SC11 社員マスタ、SC12 会社区分マスタ、SC13 承認ルートマスタ、SC16 部署マスタ（F15）。 */
 public class MasterServlet extends BaseServlet {
 
     @Override
@@ -51,9 +52,13 @@ public class MasterServlet extends BaseServlet {
                     }
                     req.setAttribute("e", e);
                     req.setAttribute("companyDivs", services().getMasterService().companyDivs());
+                    req.setAttribute("departments", services().getMasterService().departments());
                     req.setAttribute("errors", java.util.Map.of());
                     render(req, res, "emp/master/employee_form.jsp");
                 }
+                return;
+            case "departments":
+                showDepartments(req, res, null, null);
                 return;
             case "company-divs":
                 req.setAttribute("companyDivs", services().getMasterService().companyDivs());
@@ -83,9 +88,56 @@ public class MasterServlet extends BaseServlet {
         }
     }
 
+    /** SC16 部署マスタ：一覧（会社区分・部署コード順）と新規登録欄。form は入力エラー時の新規登録欄の値。 */
+    private void showDepartments(HttpServletRequest req, HttpServletResponse res, Department form, Validation v) throws ServletException, IOException {
+        req.setAttribute("departments", services().getMasterService().departments());
+        req.setAttribute("companyDivs", services().getMasterService().companyDivs());
+        req.setAttribute("form", form);
+        req.setAttribute("errors", v == null ? java.util.Map.of() : v.getErrors());
+        render(req, res, "emp/master/departments.jsp");
+    }
+
+    private void postDepartment(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+        boolean isNew = "new".equals(param(req, "mode"));
+        Department d = new Department();
+        d.setCompanyDiv(param(req, "companyDiv"));
+        d.setDeptCd(param(req, "deptCd"));
+        d.setDeptName(param(req, "deptName"));
+        d.setValidFlg(isNew || "1".equals(param(req, "validFlg")) ? Codes.FLG_ON : Codes.FLG_OFF);
+        Validation v = new Validation();
+        String prefix = isNew ? "" : d.getCompanyDiv() + ":" + d.getDeptCd() + ":";
+        if (isNew) {
+            if (d.getDeptCd().isEmpty()) {
+                v.reject("deptCd", "E001", "部署コード");
+            } else if (d.getDeptCd().length() > 10 || !Validation.isAlnum(d.getDeptCd())) {
+                v.reject("deptCd", "E003", "部署コード");
+            }
+        }
+        if (d.getDeptName().isEmpty()) {
+            v.reject(prefix + "deptName", "E001", "部署名");
+        } else if (d.getDeptName().length() > 50) {
+            v.reject(prefix + "deptName", "E002", "部署名", 50);
+        }
+        if (!v.hasErrors()) {
+            try {
+                services().getMasterService().saveDepartment(d, isNew, intParam(req, "rowVersion", -1));
+                flashMessage(req, "success", "I001");
+                redirect(req, res, "/emp/master/departments");
+                return;
+            } catch (BusinessException ex) {
+                if (!"E006".equals(ex.getMessageId()) && !"E011".equals(ex.getMessageId())) {
+                    throw ex;
+                }
+                v.reject("E006".equals(ex.getMessageId()) ? "deptCd" : "companyDiv", ex.getMessageId(), ex.getArgs());
+            }
+        }
+        showDepartments(req, res, isNew ? d : null, v);
+    }
+
     private void showRouteForm(HttpServletRequest req, HttpServletResponse res, ApprovalRoute r, Validation v) throws ServletException, IOException {
         req.setAttribute("r", r);
         req.setAttribute("companyDivs", services().getMasterService().companyDivs());
+        req.setAttribute("departments", services().getMasterService().departments());
         List<Employee> all = new ArrayList<>();
         for (CompanyDiv d : services().getMasterService().companyDivs()) {
             all.addAll(services().getMasterService().approverCandidates(d.getCompanyDiv()));
@@ -104,6 +156,7 @@ public class MasterServlet extends BaseServlet {
         switch (page) {
             case "employees": postEmployee(req, res, user, sub); return;
             case "company-divs": postCompanyDivs(req, res); return;
+            case "departments": postDepartment(req, res); return;
             case "approval-routes": postRoute(req, res, sub); return;
             default: res.sendError(404);
         }
@@ -150,9 +203,7 @@ public class MasterServlet extends BaseServlet {
             v.reject("companyDiv", "E001", "会社区分");
         }
         if (e.getDeptCd().isEmpty()) {
-            v.reject("deptCd", "E001", "部署コード");
-        } else if (e.getDeptCd().length() > 10 || !Validation.isAlnum(e.getDeptCd())) {
-            v.reject("deptCd", "E003", "部署コード");
+            v.reject("deptCd", "E001", "部署");
         }
         if (!java.util.Set.of(Codes.ROLE_OWNER, Codes.ROLE_APPROVER, Codes.ROLE_ADMIN).contains(e.getRoleCd())) {
             v.reject("roleCd", "E001", "権限");
@@ -165,6 +216,7 @@ public class MasterServlet extends BaseServlet {
         if (v.hasErrors()) {
             req.setAttribute("e", e);
             req.setAttribute("companyDivs", services().getMasterService().companyDivs());
+            req.setAttribute("departments", services().getMasterService().departments());
             req.setAttribute("errors", v.getErrors());
             render(req, res, "emp/master/employee_form.jsp");
             return;
@@ -172,10 +224,15 @@ public class MasterServlet extends BaseServlet {
         try {
             services().getMasterService().saveEmployee(e, password, rowVersion(req));
         } catch (BusinessException ex) {
-            if ("E006".equals(ex.getMessageId())) {
-                v.reject("employeeNo", "E006", "社員番号");
+            if ("E006".equals(ex.getMessageId()) || "E011".equals(ex.getMessageId())) {
+                if ("E006".equals(ex.getMessageId())) {
+                    v.reject("employeeNo", "E006", "社員番号");
+                } else {
+                    v.reject("deptCd", "E011", "部署");
+                }
                 req.setAttribute("e", e);
                 req.setAttribute("companyDivs", services().getMasterService().companyDivs());
+                req.setAttribute("departments", services().getMasterService().departments());
                 req.setAttribute("errors", v.getErrors());
                 render(req, res, "emp/master/employee_form.jsp");
                 return;
@@ -261,9 +318,7 @@ public class MasterServlet extends BaseServlet {
         r.setValidFrom(from);
         r.setValidTo(to);
         if (r.getDeptCd().isEmpty()) {
-            v.reject("deptCd", "E001", "部署コード");
-        } else if (r.getDeptCd().length() > 10 || !Validation.isAlnum(r.getDeptCd())) {
-            v.reject("deptCd", "E003", "部署コード");
+            v.reject("deptCd", "E001", "部署");
         }
         if (r.getRouteName().isEmpty()) {
             v.reject("routeName", "E001", "ルート名");
@@ -299,6 +354,11 @@ public class MasterServlet extends BaseServlet {
         } catch (BusinessException ex) {
             if ("E108".equals(ex.getMessageId())) {
                 v.reject("approverId", "E108");
+                showRouteForm(req, res, r, v);
+                return;
+            }
+            if ("E011".equals(ex.getMessageId())) {
+                v.reject("deptCd", "E011", "部署");
                 showRouteForm(req, res, r, v);
                 return;
             }
