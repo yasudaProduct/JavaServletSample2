@@ -2,11 +2,11 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.6（版に会社B だけの追加項目（法人番号・設置場所・窓口メモ）を追加。版 0.5：部署マスタ M_DEPARTMENT を追加し、版に担当（会社区分・部署・担当社員）を記録。版 0.4：申込者アカウントを複数の申込で共有するのは追加申込だけ。版 0.3：申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウントに変更） |
+| 版 | 0.7（同意事項マスタ・同意事項の版・申込者同意の同意事項・申込内容 PDF を追加。版 0.6：版に会社B だけの追加項目（法人番号・設置場所・窓口メモ）を追加。版 0.5：部署マスタ M_DEPARTMENT を追加し、版に担当（会社区分・部署・担当社員）を記録。版 0.4：申込者アカウントを複数の申込で共有するのは追加申込だけ。版 0.3：申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウントに変更） |
 | 図の原本 | [er-diagram.drawio](../diagrams/er-diagram.drawio)（draw.io 形式。PNG は [diagrams/png/er-diagram.png](../diagrams/png/er-diagram.png)） |
 | 関連 | [07. テーブル定義](07-table-definition.md)、[08. コード定義](08-code-definition.md) |
 
-申込（T_APPLICATION）が中心で、申込内容は版として子テーブルに持ち、承認申請・申込者同意・外部連携は版に紐づく。テーブルはマスタ 8 本、トランザクション 10 本の計 18 本。
+申込（T_APPLICATION）が中心で、申込内容は版として子テーブルに持ち、承認申請・申込者同意・外部連携は版に紐づく。テーブルはマスタ 10 本、トランザクション 12 本の計 22 本。
 
 ## 1. ER図（全体）
 
@@ -42,6 +42,11 @@ erDiagram
     T_APPLICATION_VERSION ||--o{ T_APPLICANT_CONSENT : "申込者同意"
     T_APPLICATION_VERSION ||--o{ T_EXTERNAL_LINK : "外部連携"
     M_STATUS_TRANSITION |o--o{ T_STATUS_HISTORY : "採用した遷移"
+    M_CONSENT_DOCUMENT ||--|{ M_CONSENT_DOCUMENT_VERSION : "版"
+    M_CONSENT_DOCUMENT_VERSION ||--o{ T_APPLICANT_CONSENT_DOCUMENT : "開いた・同意した版"
+    T_APPLICANT_CONSENT ||--o{ T_APPLICANT_CONSENT_DOCUMENT : "同意事項"
+    T_APPLICATION_VERSION ||--o{ T_APPLICATION_PDF : "申込内容 PDF"
+    T_APPLICANT_CONSENT |o--o{ T_APPLICATION_PDF : "同意時 PDF"
 ```
 
 ## 3. リレーション一覧
@@ -72,6 +77,11 @@ erDiagram
 | 22 | M_DEPARTMENT | M_EMPLOYEE | COMPANY_DIV、DEPT_CD | 1 : 0..n | 所属部署 |
 | 23 | M_DEPARTMENT | M_APPROVAL_ROUTE | COMPANY_DIV、DEPT_CD | 1 : 0..n | テンプレートの部署 |
 | 24 | M_DEPARTMENT | T_APPLICATION | COMPANY_DIV、DEPT_CD | 1 : 0..n | 申込の担当部署。担当者の所属部署と異なってよい |
+| 25 | M_CONSENT_DOCUMENT | M_CONSENT_DOCUMENT_VERSION | DOCUMENT_CD | 1 : 1..n | 識別関係。版は追加のみ |
+| 26 | M_CONSENT_DOCUMENT_VERSION | T_APPLICANT_CONSENT_DOCUMENT | DOCUMENT_CD、VERSION_NO | 1 : 0..n | 申込者が開いた版・同意した版 |
+| 27 | T_APPLICANT_CONSENT | T_APPLICANT_CONSENT_DOCUMENT | CONSENT_ID | 1 : 0..n | 識別関係。同意（確認依頼）ごと |
+| 28 | T_APPLICATION_VERSION | T_APPLICATION_PDF | APPLICATION_ID、VERSION_NO | 1 : 0..n | PDF に載せた版 |
+| 29 | T_APPLICANT_CONSENT | T_APPLICATION_PDF | CONSENT_ID | 0..1 : 0..n | 同意時 PDF のみ。審査完了時 PDF は空 |
 | （省略） | M_EMPLOYEE | M_APPROVAL_ROUTE_STEP、T_APPROVAL_STEP、T_APPROVAL_REQUEST、T_IMPORT_BATCH | APPROVER_EMPLOYEE_ID、REQUEST_EMPLOYEE_ID、IMPORT_EMPLOYEE_ID | 1 : 0..n | 図では省略 |
 
 ## 4. データモデルの要点
@@ -119,3 +129,9 @@ erDiagram
 
 - 会社B（会社区分 2）の申込だけが持つ入力項目（法人番号・設置場所・窓口メモ。サンプル）は、ほかの申込内容と同じく申込内容（T_APPLICATION_VERSION）の版ごとの列に持つ。会社区分 2 以外の申込では空。
 - 項目を使った制御はないため、別テーブルや外部キーは設けない。
+
+### 4.9 同意事項と申込内容 PDF
+
+- 同意事項は文書（M_CONSENT_DOCUMENT）と版（M_CONSENT_DOCUMENT_VERSION）に分け、版に PDF 本体とハッシュを持つ。改定は版の追加で行い、登録済みの版は変更しない。表示する版は適用開始日時で決まる。
+- 申込者がどの版を開き、どの版に同意したかは、申込者同意（確認依頼）ごとに T_APPLICANT_CONSENT_DOCUMENT に残す。
+- 申込内容 PDF（T_APPLICATION_PDF）は同意時（申込者同意に紐づく）と審査完了時に作成し、載せた版に紐づける。作成後は変更しない。

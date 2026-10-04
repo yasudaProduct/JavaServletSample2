@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.4（申込者ページ（`/my/`）の追加と Servlet の構成を実装に合わせる。版 0.3：実行環境の確定を反映） |
+| 版 | 0.5（PDF の作成（Apache PDFBox、日本語フォント同梱）と document パッケージを追加。版 0.4：申込者ページ（`/my/`）の追加と Servlet の構成を実装に合わせる。版 0.3：実行環境の確定を反映） |
 | 前提 | 実行環境は Tomcat 9／SQL Server 2019／Java 17 で確定（2026-10-02）。開発環境は Docker Compose で構成する |
 
 ## 1. システム構成
@@ -50,6 +50,7 @@ flowchart LR
 | DB | SQL Server 2019 | スキーマと初期データは Flyway 9 で起動時に適用する（`db/migration`、DBMS 別は `db/vendor`） |
 | メール | javax.mail 1.6（JavaMail） | SMTP。`mail.mode=log` で送信せずログ出力にできる |
 | JSON | Jackson | 外部 IF の入出力 |
+| PDF | Apache PDFBox 2.0、日本語フォント BIZ UDゴシック（SIL Open Font License 1.1、WAR に同梱） | 申込内容 PDF の作成とサンプルの同意事項 PDF。フォントはサブセットで埋め込むため、閲覧側に日本語フォントは不要。PDF 本体は DB（VARBINARY(MAX)）に保存する |
 | ログ | SLF4J + Logback | アプリログ・バッチログ |
 | ビルド | Maven（WAR パッケージ） | |
 | テスト | JUnit 5、Playwright（画面の一括動作確認） | 遷移条件・入力チェックの単体テストと、主要フローのブラウザ操作 |
@@ -117,6 +118,7 @@ com.example.appmgmt
 │   ├── application   申込の検索・詳細、入力・修正・契約変更、一括取込
 │   ├── approval      承認申請・承認・差戻し・審査申請
 │   ├── consent       申込者同意（トークン発行、確認・同意・差戻し）
+│   ├── document      同意事項 PDF（版・閲覧の記録・同意の確認）と申込内容 PDF（同意時・審査完了時）の作成
 │   ├── external      審査担当部門連携（送信電文の組み立て、結果受信）
 │   ├── transition    F14 ステータス遷移制御・条件評価・後続処理
 │   ├── notification  通知の登録（テンプレート展開）
@@ -127,6 +129,7 @@ com.example.appmgmt
 ├── infra
 │   ├── mail          メール送信（log／smtp）
 │   ├── extapi        審査担当部門システム API クライアント（mock／http）
+│   ├── pdf           PDF の作成（A4 の表・段落・ページ番号、日本語フォントの埋め込み）
 │   └── scheduler     スケジューラと通知送信・外部送信ジョブ
 └── common            設定、DataSource、トランザクション、例外、メッセージ、書式、ハッシュ
 ```
