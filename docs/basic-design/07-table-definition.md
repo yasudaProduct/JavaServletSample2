@@ -2,32 +2,33 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.7（申込者アカウントの紐づけは一次承認での発行と追加申込の引き継ぎだけにする。版 0.6：申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウント（M_APPLICANT_ACCOUNT）に変更） |
+| 版 | 0.8（部署マスタ M_DEPARTMENT を追加し、申込内容（版）に担当（会社区分・部署・担当社員）を記録。版 0.7：申込者アカウントの紐づけは一次承認での発行と追加申込の引き継ぎだけにする。版 0.6：申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウント（M_APPLICANT_ACCOUNT）に変更） |
 | 関連 | [06. ER図](06-er-diagram.md)、[08. コード定義](08-code-definition.md)、[03. ステータス定義・状態遷移](03-status-transition.md) |
 
-テーブルはマスタ 7 本とトランザクション 10 本の計 17 本。型は論理型で記載し、SQL Server を想定した物理型は 3 章の対応表に従う（DBMS 確定後に見直す）。
+テーブルはマスタ 8 本とトランザクション 10 本の計 18 本。型は論理型で記載し、SQL Server を想定した物理型は 3 章の対応表に従う（DBMS 確定後に見直す）。
 
 ## 1. テーブル一覧
 
 | No | 論理名 | 物理名 | 種別 | 概要 |
 | --- | --- | --- | --- | --- |
 | 1 | 会社区分マスタ | M_COMPANY_DIV | マスタ | 会社区分と外部事前確認の有無、金額倍率しきい値 |
-| 2 | 社員マスタ | M_EMPLOYEE | マスタ | 申込受付会社の社員と所属会社区分・部署・権限 |
-| 3 | 申込者アカウント | M_APPLICANT_ACCOUNT | マスタ | 申込者ページのログインに必要なデータ（ユーザー ID・パスワード）。申込者名・連絡先は申込内容（版）が持つ |
-| 4 | ステータスマスタ | M_STATUS | マスタ | 23 ステータスと分類・操作主体・表示名 |
-| 5 | ステータス遷移マスタ | M_STATUS_TRANSITION | マスタ | 遷移元・操作・条件・遷移先・会社区分による有効範囲 |
-| 6 | 承認ルートマスタ | M_APPROVAL_ROUTE | マスタ | 会社区分・部署・承認種別ごとの回付先テンプレート |
-| 7 | 承認ルート明細 | M_APPROVAL_ROUTE_STEP | マスタ | テンプレート内の承認者と順序 |
-| 8 | 一括取込 | T_IMPORT_BATCH | トランザクション | 取込ファイル単位の実行結果 |
-| 9 | 取込エラー | T_IMPORT_ERROR | トランザクション | 取込でスキップした行と理由 |
-| 10 | 申込 | T_APPLICATION | トランザクション | 申込 1 件の現在ステータス、現行版・基準版・審査完了版 |
-| 11 | 申込内容（版） | T_APPLICATION_VERSION | トランザクション | 版ごとの申込内容 |
-| 12 | 承認申請 | T_APPROVAL_REQUEST | トランザクション | 申請 1 回分の回付状況 |
-| 13 | 承認明細 | T_APPROVAL_STEP | トランザクション | 承認者ごとの承認・差戻し・審査申請の結果 |
-| 14 | 申込者同意 | T_APPLICANT_CONSENT | トランザクション | 申込者の確定・同意・差戻しの記録と確認用トークン |
-| 15 | 外部連携 | T_EXTERNAL_LINK | トランザクション | 審査担当部門システムへの事前確認依頼・審査依頼と結果 |
-| 16 | 通知 | T_NOTIFICATION | トランザクション | メール通知のキューと送信結果 |
-| 17 | ステータス履歴 | T_STATUS_HISTORY | トランザクション | ステータス変更の全履歴 |
+| 2 | 部署マスタ | M_DEPARTMENT | マスタ | 会社区分ごとの部署コードと部署名（申込受付会社の会社 > 部署 > 担当者の部署） |
+| 3 | 社員マスタ | M_EMPLOYEE | マスタ | 申込受付会社の社員と所属会社区分・部署・権限 |
+| 4 | 申込者アカウント | M_APPLICANT_ACCOUNT | マスタ | 申込者ページのログインに必要なデータ（ユーザー ID・パスワード）。申込者名・連絡先は申込内容（版）が持つ |
+| 5 | ステータスマスタ | M_STATUS | マスタ | 23 ステータスと分類・操作主体・表示名 |
+| 6 | ステータス遷移マスタ | M_STATUS_TRANSITION | マスタ | 遷移元・操作・条件・遷移先・会社区分による有効範囲 |
+| 7 | 承認ルートマスタ | M_APPROVAL_ROUTE | マスタ | 会社区分・部署・承認種別ごとの回付先テンプレート |
+| 8 | 承認ルート明細 | M_APPROVAL_ROUTE_STEP | マスタ | テンプレート内の承認者と順序 |
+| 9 | 一括取込 | T_IMPORT_BATCH | トランザクション | 取込ファイル単位の実行結果 |
+| 10 | 取込エラー | T_IMPORT_ERROR | トランザクション | 取込でスキップした行と理由 |
+| 11 | 申込 | T_APPLICATION | トランザクション | 申込 1 件の現在ステータス、現行版・基準版・審査完了版 |
+| 12 | 申込内容（版） | T_APPLICATION_VERSION | トランザクション | 版ごとの申込内容 |
+| 13 | 承認申請 | T_APPROVAL_REQUEST | トランザクション | 申請 1 回分の回付状況 |
+| 14 | 承認明細 | T_APPROVAL_STEP | トランザクション | 承認者ごとの承認・差戻し・審査申請の結果 |
+| 15 | 申込者同意 | T_APPLICANT_CONSENT | トランザクション | 申込者の確定・同意・差戻しの記録と確認用トークン |
+| 16 | 外部連携 | T_EXTERNAL_LINK | トランザクション | 審査担当部門システムへの事前確認依頼・審査依頼と結果 |
+| 17 | 通知 | T_NOTIFICATION | トランザクション | メール通知のキューと送信結果 |
+| 18 | ステータス履歴 | T_STATUS_HISTORY | トランザクション | ステータス変更の全履歴 |
 
 ## 2. 共通項目
 
@@ -68,7 +69,18 @@
 | 外部事前確認フラグ | PRE_CHECK_FLG | 固定長(1) | ○ | | 1：あり、0：なし |
 | 金額倍率しきい値 | AMOUNT_RATIO_LIMIT | 数値(3,2) | ○ | | 既定値 1.50。申込金額合計の基準版に対する倍率がこの値以上なら変更基準超。減額は常に基準内 |
 
-### 4.2 社員マスタ（M_EMPLOYEE）
+### 4.2 部署マスタ（M_DEPARTMENT）
+
+申込受付会社の「会社 > 部署 > 担当者」の部署。社員の所属部署、承認ルートの部署、申込の担当部署はこのマスタから選ぶ。保守は管理者が SC16 で行う（[11. 4.16 節](11-screen-design.md#416-sc16-部署マスタ)）。部署は削除せず、使わなくなったら無効にする。
+
+| 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
+| --- | --- | --- | --- | --- | --- |
+| 会社区分 | COMPANY_DIV | 固定長(1) | ○ | PK、FK | M_COMPANY_DIV |
+| 部署コード | DEPT_CD | 文字列(10) | ○ | PK | 会社区分の中で一意。半角英数字。登録後は変更しない |
+| 部署名 | DEPT_NAME | 文字列(50) | ○ | | 画面の表示名 |
+| 有効フラグ | VALID_FLG | 固定長(1) | ○ | | 1：有効、0：無効。無効な部署は新しく選べない（設定済みの社員・承認ルート・申込はそのまま） |
+
+### 4.3 社員マスタ（M_EMPLOYEE）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -77,16 +89,16 @@
 | 氏名 | EMPLOYEE_NAME | 文字列(50) | ○ | | |
 | パスワードハッシュ | PASSWORD_HASH | 文字列(100) | ○ | | ID／パスワード認証用。ソルト付きハッシュ。社内認証基盤と連携する場合は未使用 |
 | 会社区分 | COMPANY_DIV | 固定長(1) | ○ | FK | M_COMPANY_DIV |
-| 部署コード | DEPT_CD | 文字列(10) | ○ | | 承認ルートテンプレートの検索に使う |
+| 部署コード | DEPT_CD | 文字列(10) | ○ | FK | 所属部署。M_DEPARTMENT（COMPANY_DIV, DEPT_CD）。申込の担当部署の既定値 |
 | 権限 | ROLE_CD | 固定長(2) | ○ | | 01：担当者、02：承認者、09：管理者 |
 | メールアドレス | MAIL_ADDRESS | 文字列(254) | ○ | | 承認依頼通知などの宛先 |
 | 有効フラグ | VALID_FLG | 固定長(1) | ○ | | 1：有効、0：無効。無効な社員はログインできず、回付先にも設定できない |
 
 インデックス：IX_M_EMPLOYEE_01（COMPANY_DIV, DEPT_CD）
 
-### 4.3 申込者アカウント（M_APPLICANT_ACCOUNT）
+### 4.4 申込者アカウント（M_APPLICANT_ACCOUNT）
 
-申込者ページにログインするためのデータだけを持つ。申込の一次承認が通って申込内容確認待ちになったとき、申込がまだアカウントに紐づいていなければ発行し、申込（T_APPLICATION.APPLICANT_ID）に紐づける（F14 後続処理、[10. 17.2 節](10-function-detail.md#172-アカウント発行f14-後続処理)）。初期データには持たない。申込者名・メールアドレスなどの申込者情報は申込データとして申込内容（版）に持つ（4.11 節、[10. 18 章](10-function-detail.md#18-申込者情報と申込者アカウント)）。
+申込者ページにログインするためのデータだけを持つ。申込の一次承認が通って申込内容確認待ちになったとき、申込がまだアカウントに紐づいていなければ発行し、申込（T_APPLICATION.APPLICANT_ID）に紐づける（F14 後続処理、[10. 17.2 節](10-function-detail.md#172-アカウント発行f14-後続処理)）。初期データには持たない。申込者名・メールアドレスなどの申込者情報は申込データとして申込内容（版）に持つ（4.12 節、[10. 18 章](10-function-detail.md#18-申込者情報と申込者アカウント)）。
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -98,7 +110,7 @@
 
 PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追加した列のため、DB 上は NULL 可のまま）。
 
-### 4.4 ステータスマスタ（M_STATUS）
+### 4.5 ステータスマスタ（M_STATUS）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -113,7 +125,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | 表示順 | DISPLAY_ORDER | 数値(3) | ○ | | 一覧の検索条件・並び順に使う |
 | 状態説明 | DESCRIPTION | 文字列(200) | | | 状態の説明文 |
 
-### 4.5 ステータス遷移マスタ（M_STATUS_TRANSITION）
+### 4.6 ステータス遷移マスタ（M_STATUS_TRANSITION）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -130,7 +142,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 ユニーク制約：UK_M_STATUS_TRANSITION_01（FROM_STATUS_CD, ACTION_CD, PRE_CHECK_COND, EVAL_ORDER）
 初期データは [03. ステータス定義・状態遷移 6 章](03-status-transition.md#6-ステータス遷移マスタ-初期データ) を参照。
 
-### 4.6 承認ルートマスタ（M_APPROVAL_ROUTE）
+### 4.7 承認ルートマスタ（M_APPROVAL_ROUTE）
 
 承認フロー画面で回付先の初期値として使うテンプレート。申請者は画面で回付先を変更できる（仮）。
 
@@ -138,7 +150,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | --- | --- | --- | --- | --- | --- |
 | ルートID | ROUTE_ID | 数値(10) | ○ | PK | |
 | 会社区分 | COMPANY_DIV | 固定長(1) | ○ | FK | M_COMPANY_DIV |
-| 部署コード | DEPT_CD | 文字列(10) | ○ | | |
+| 部署コード | DEPT_CD | 文字列(10) | ○ | FK | M_DEPARTMENT（COMPANY_DIV, DEPT_CD）。申込の担当部署と一致するテンプレートを使う |
 | 承認種別 | APPROVAL_TYPE | 固定長(2) | ○ | | 01：一次承認、02：最終承認、03：契約変更一次承認、04：契約変更最終承認 |
 | ルート名 | ROUTE_NAME | 文字列(50) | ○ | | |
 | 適用開始日 | VALID_FROM | 日付 | ○ | | |
@@ -146,7 +158,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 
 インデックス：IX_M_APPROVAL_ROUTE_01（COMPANY_DIV, DEPT_CD, APPROVAL_TYPE, VALID_FROM）
 
-### 4.7 承認ルート明細（M_APPROVAL_ROUTE_STEP）
+### 4.8 承認ルート明細（M_APPROVAL_ROUTE_STEP）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -154,7 +166,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | ステップ番号 | STEP_NO | 数値(2) | ○ | PK | 1 から連番。最大値が最終承認者 |
 | 承認者社員ID | APPROVER_EMPLOYEE_ID | 数値(10) | ○ | FK | M_EMPLOYEE |
 
-### 4.8 一括取込（T_IMPORT_BATCH）
+### 4.9 一括取込（T_IMPORT_BATCH）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -166,7 +178,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | 成功件数 | SUCCESS_COUNT | 数値(6) | ○ | | 10100 で登録した件数 |
 | エラー件数 | ERROR_COUNT | 数値(6) | ○ | | スキップした件数 |
 
-### 4.9 取込エラー（T_IMPORT_ERROR）
+### 4.10 取込エラー（T_IMPORT_ERROR）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -175,16 +187,16 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | エラー内容 | ERROR_MESSAGE | 文字列(500) | ○ | | 複数エラーは区切り文字で連結 |
 | 行データ | RAW_LINE | 文字列(2000) | | | 元の行をそのまま保持 |
 
-### 4.10 申込（T_APPLICATION）
+### 4.11 申込（T_APPLICATION）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
 | 申込ID | APPLICATION_ID | 数値(10) | ○ | PK | |
 | 申込番号 | APPLICATION_NO | 文字列(12) | ○ | UK | 画面・帳票に表示する番号。採番規則は [14. 共通仕様](14-common-spec.md) |
 | 申込者ID | APPLICANT_ID | 数値(10) | | FK | M_APPLICANT_ACCOUNT。新規申込は申込者アカウントの発行（一次承認が通ったとき）で設定し、追加申込は元の申込の値を引き継ぐ。空はアカウント未発行 |
-| 担当社員ID | OWNER_EMPLOYEE_ID | 数値(10) | ○ | FK | M_EMPLOYEE。取込時は取込社員、画面入力時は入力社員 |
-| 会社区分 | COMPANY_DIV | 固定長(1) | ○ | FK | 起票時点の担当社員の会社区分を保持 |
-| 部署コード | DEPT_CD | 文字列(10) | ○ | | 起票時点の担当社員の部署 |
+| 担当社員ID | OWNER_EMPLOYEE_ID | 数値(10) | ○ | FK | M_EMPLOYEE。申込の担当者（操作できる担当者権限の社員）。取込時は取込社員、画面入力時は SC04 で選んだ社員（既定は入力した社員） |
+| 会社区分 | COMPANY_DIV | 固定長(1) | ○ | FK | 申込の担当会社。事前確認の有無・変更基準・承認者の候補を決める。SC04 で選ぶ（既定は入力した社員の会社区分）。取込時は取込社員の会社区分 |
+| 部署コード | DEPT_CD | 文字列(10) | ○ | FK | 申込の担当部署。M_DEPARTMENT（COMPANY_DIV, DEPT_CD）。承認ルートテンプレートの検索と承認者の参照範囲に使う。担当者の所属部署と異なってよい |
 | ステータスコード | STATUS_CD | 固定長(5) | ○ | FK | M_STATUS。現在のステータス |
 | 現行版番号 | CURRENT_VERSION_NO | 数値(3) | ○ | | 編集中または承認・確認・審査中の版 |
 | 基準版番号 | BASE_VERSION_NO | 数値(3) | | | 変更基準の比較元。申込者同意時と契約変更開始時に更新 |
@@ -194,9 +206,11 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | 取込ID | IMPORT_BATCH_ID | 数値(10) | | FK | T_IMPORT_BATCH。一括取込の場合のみ |
 | 審査完了日時 | REVIEWED_AT | 日時 | | | 直近の審査完了日時 |
 
+会社区分・部署コード・担当社員ID は申込の担当（会社 > 部署 > 担当者）で、変更できるのは申込入力中（10101）だけ。現行版（T_APPLICATION_VERSION）にも同じ値を記録する。
+
 インデックス：IX_T_APPLICATION_01（STATUS_CD）、IX_T_APPLICATION_02（OWNER_EMPLOYEE_ID, STATUS_CD）、IX_T_APPLICATION_03（APPLICANT_ID）
 
-### 4.11 申込内容（版）（T_APPLICATION_VERSION）
+### 4.12 申込内容（版）（T_APPLICATION_VERSION）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -204,6 +218,9 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | 版番号 | VERSION_NO | 数値(3) | ○ | PK | 1 から連番 |
 | 版種別 | VERSION_TYPE | 固定長(1) | ○ | | 1：新規申込、2：新規申込の修正、3：契約変更、4：契約変更の修正 |
 | 複写元版番号 | COPIED_FROM_VERSION_NO | 数値(3) | | | 複写して作った版の複写元。第 1 版は空 |
+| 会社区分 | COMPANY_DIV | 固定長(1) | | | この版の担当会社（申込の COMPANY_DIV の記録。SC04 で選ぶ）。外部キーなし |
+| 部署コード | DEPT_CD | 文字列(10) | | | この版の担当部署（申込の DEPT_CD の記録）。外部キーなし |
+| 担当社員ID | OWNER_EMPLOYEE_ID | 数値(10) | | | この版の担当者（申込の OWNER_EMPLOYEE_ID の記録）。外部キーなし |
 | 申込者名 | APPLICANT_NAME | 文字列(100) | | | 申込データ。確認へ・確定・取込で必須（一時保存では空を許す） |
 | 申込者名カナ | APPLICANT_KANA | 文字列(100) | | | 全角カナ |
 | 電話番号 | TEL_NO | 文字列(15) | | | 数字とハイフン |
@@ -222,7 +239,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | 確定版フラグ | FIXED_FLG | 固定長(1) | ○ | | 1：申込者が同意した版または審査完了した版。以降は変更しない |
 | 取消フラグ | CANCELED_FLG | 固定長(1) | ○ | | 1：契約変更の審査差戻しで取り消した版 |
 
-### 4.12 承認申請（T_APPROVAL_REQUEST）
+### 4.13 承認申請（T_APPROVAL_REQUEST）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -240,7 +257,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 
 インデックス：IX_T_APPROVAL_REQUEST_01（APPLICATION_ID, REQUEST_STATUS）
 
-### 4.13 承認明細（T_APPROVAL_STEP）
+### 4.14 承認明細（T_APPROVAL_STEP）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -253,7 +270,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 
 インデックス：IX_T_APPROVAL_STEP_01（APPROVER_EMPLOYEE_ID, RESULT_CD）
 
-### 4.14 申込者同意（T_APPLICANT_CONSENT）
+### 4.15 申込者同意（T_APPLICANT_CONSENT）
 
 確認依頼（確認用 URL の発行）1 回につき 1 行。
 
@@ -274,7 +291,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 
 インデックス：IX_T_APPLICANT_CONSENT_01（APPLICATION_ID, CONSENT_STATUS）
 
-### 4.15 外部連携（T_EXTERNAL_LINK）
+### 4.16 外部連携（T_EXTERNAL_LINK）
 
 審査担当部門システムへの依頼 1 回につき 1 行。
 
@@ -296,7 +313,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 インデックス：IX_T_EXTERNAL_LINK_01（SEND_STATUS）、IX_T_EXTERNAL_LINK_02（APPLICATION_ID, VERSION_NO）
 外部受付番号の UK は NULL を除外したフィルタ付きユニークインデックスとする。
 
-### 4.16 通知（T_NOTIFICATION）
+### 4.17 通知（T_NOTIFICATION）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -313,7 +330,7 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 
 インデックス：IX_T_NOTIFICATION_01（SEND_STATUS, CREATED_AT）
 
-### 4.17 ステータス履歴（T_STATUS_HISTORY）
+### 4.18 ステータス履歴（T_STATUS_HISTORY）
 
 | 論理名 | 物理名 | 型 | 必須 | キー | 説明 |
 | --- | --- | --- | --- | --- | --- |
@@ -372,3 +389,11 @@ PASSWORD_HASH・ACCOUNT_ISSUED_AT は発行時に必ず設定する（V3 で追�
 | T_APPLICATION_VERSION | APPLICANT_NAME、APPLICANT_KANA、TEL_NO、MAIL_ADDRESS、ADDRESS を追加。既存の申込は申込者マスタの値を全版へ複写 | 申込者情報を申込データとして版で持つ（全体修正・契約変更・申込者の修正の対象、差分表示） |
 | T_APPLICATION | APPLICANT_ID を任意（NULL 可）に変更。アカウント未発行の申込者を参照していた申込は空にする | 申込者アカウントは一次承認が通ったときに発行して紐づける |
 | M_APPLICANT → M_APPLICANT_ACCOUNT | 名称変更。APPLICANT_NAME、APPLICANT_KANA、MAIL_ADDRESS、TEL_NO、ADDRESS を削除。アカウント未発行（PASSWORD_HASH が空）の行を削除 | 申込データとログインに必要なデータを分ける |
+
+## 9. 実装 V6 の変更点
+
+| 対象 | 変更 | 理由 |
+| --- | --- | --- |
+| M_DEPARTMENT | 部署マスタを追加。既存の社員・承認ルート・申込の部署コードから作成（100：営業部、900：管理部、200：営業部、それ以外は「部署 + コード」の仮の名称） | 申込の担当（会社 > 部署 > 担当者）を部署名で選び、表示するため |
+| M_EMPLOYEE、M_APPROVAL_ROUTE、T_APPLICATION | （COMPANY_DIV, DEPT_CD）に M_DEPARTMENT への外部キーを追加（V6_1） | 部署はマスタから選ぶ |
+| T_APPLICATION_VERSION | COMPANY_DIV、DEPT_CD、OWNER_EMPLOYEE_ID を追加。既存の版には申込の値を複写（V6_1） | 版ごとに担当を記録し、全体修正で変えた担当を差分（赤字）で表示する |

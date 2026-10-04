@@ -2,26 +2,30 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.4（申込者アカウントを複数の申込で共有するのは追加申込だけ。版 0.3：申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウントに変更） |
+| 版 | 0.5（部署マスタ M_DEPARTMENT を追加し、版に担当（会社区分・部署・担当社員）を記録。版 0.4：申込者アカウントを複数の申込で共有するのは追加申込だけ。版 0.3：申込者情報を申込内容（版）へ移し、申込者マスタをログイン用の申込者アカウントに変更） |
 | 図の原本 | [er-diagram.drawio](../diagrams/er-diagram.drawio)（draw.io 形式。PNG は [diagrams/png/er-diagram.png](../diagrams/png/er-diagram.png)） |
 | 関連 | [07. テーブル定義](07-table-definition.md)、[08. コード定義](08-code-definition.md) |
 
-申込（T_APPLICATION）が中心で、申込内容は版として子テーブルに持ち、承認申請・申込者同意・外部連携は版に紐づく。テーブルはマスタ 7 本、トランザクション 10 本の計 17 本。
+申込（T_APPLICATION）が中心で、申込内容は版として子テーブルに持ち、承認申請・申込者同意・外部連携は版に紐づく。テーブルはマスタ 8 本、トランザクション 10 本の計 18 本。
 
 ## 1. ER図（全体）
 
 ![ER図](../diagrams/png/er-diagram.png)
 
-社員マスタから承認明細・承認ルート明細・一括取込・承認申請への参照（承認者、取込者、申請者）と、申込から追加申込元申込への自己参照は、線が混み合うため図から省いている。各テーブルの項目は [07. テーブル定義](07-table-definition.md) を参照。
+社員マスタから承認明細・承認ルート明細・一括取込・承認申請への参照（承認者、取込者、申請者）と、申込から追加申込元申込への自己参照は、線が混み合うため図から省いている。社員・承認ルート・申込から会社区分マスタへの参照は、部署マスタへの複合外部キー（COMPANY_DIV, DEPT_CD）の線で表している。各テーブルの項目は [07. テーブル定義](07-table-definition.md) を参照。
 
 ## 2. ER図（概要：エンティティと関連のみ）
 
 ```mermaid
 erDiagram
+    M_COMPANY_DIV ||--o{ M_DEPARTMENT : "部署"
     M_COMPANY_DIV ||--o{ M_EMPLOYEE : "所属"
+    M_DEPARTMENT ||--o{ M_EMPLOYEE : "所属部署"
+    M_DEPARTMENT ||--o{ M_APPROVAL_ROUTE : "部署"
+    M_DEPARTMENT ||--o{ T_APPLICATION : "担当部署"
     M_COMPANY_DIV ||--o{ M_APPROVAL_ROUTE : "会社区分"
     M_COMPANY_DIV ||--o{ T_APPLICATION : "会社区分"
-    M_EMPLOYEE ||--o{ T_APPLICATION : "担当社員"
+    M_EMPLOYEE ||--o{ T_APPLICATION : "担当者"
     M_APPLICANT_ACCOUNT |o--o{ T_APPLICATION : "申込者アカウント"
     M_STATUS ||--o{ T_APPLICATION : "現在ステータス"
     M_STATUS ||--o{ M_STATUS_TRANSITION : "遷移元 / 遷移先"
@@ -46,8 +50,8 @@ erDiagram
 | --- | --- | --- | --- | --- | --- |
 | 1 | M_COMPANY_DIV | M_EMPLOYEE | COMPANY_DIV | 1 : 0..n | |
 | 2 | M_COMPANY_DIV | M_APPROVAL_ROUTE | COMPANY_DIV | 1 : 0..n | |
-| 3 | M_COMPANY_DIV | T_APPLICATION | COMPANY_DIV | 1 : 0..n | 起票時点の担当社員の会社区分 |
-| 4 | M_EMPLOYEE | T_APPLICATION | OWNER_EMPLOYEE_ID | 1 : 0..n | 担当社員 |
+| 3 | M_COMPANY_DIV | T_APPLICATION | COMPANY_DIV | 1 : 0..n | 申込の担当会社（既定は入力した社員の会社区分。入力中だけ変更できる） |
+| 4 | M_EMPLOYEE | T_APPLICATION | OWNER_EMPLOYEE_ID | 1 : 0..n | 申込の担当者（操作できる社員。既定は入力した社員。入力中だけ変更できる） |
 | 5 | M_APPLICANT_ACCOUNT | T_APPLICATION | APPLICANT_ID | 0..1 : 0..n | 新規申込は一次承認が通ったときにアカウントを発行して紐づける。追加申込は元の申込のアカウントを引き継ぐ。未発行の申込は空 |
 | 6 | M_STATUS | T_APPLICATION | STATUS_CD | 1 : 0..n | 現在ステータス |
 | 7 | M_STATUS | M_STATUS_TRANSITION | FROM_STATUS_CD、TO_STATUS_CD | 1 : 0..n（2 本） | |
@@ -64,6 +68,10 @@ erDiagram
 | 18 | T_APPLICATION_VERSION | T_APPLICANT_CONSENT | APPLICATION_ID、VERSION_NO | 1 : 0..n | 確認対象の版 |
 | 19 | T_APPLICATION_VERSION | T_EXTERNAL_LINK | APPLICATION_ID、VERSION_NO | 1 : 0..n | 依頼対象の版 |
 | 20 | M_STATUS_TRANSITION | T_STATUS_HISTORY | TRANSITION_ID | 0..1 : 0..n | 新規作成時は空 |
+| 21 | M_COMPANY_DIV | M_DEPARTMENT | COMPANY_DIV | 1 : 0..n | 識別関係（複合主キー） |
+| 22 | M_DEPARTMENT | M_EMPLOYEE | COMPANY_DIV、DEPT_CD | 1 : 0..n | 所属部署 |
+| 23 | M_DEPARTMENT | M_APPROVAL_ROUTE | COMPANY_DIV、DEPT_CD | 1 : 0..n | テンプレートの部署 |
+| 24 | M_DEPARTMENT | T_APPLICATION | COMPANY_DIV、DEPT_CD | 1 : 0..n | 申込の担当部署。担当者の所属部署と異なってよい |
 | （省略） | M_EMPLOYEE | M_APPROVAL_ROUTE_STEP、T_APPROVAL_STEP、T_APPROVAL_REQUEST、T_IMPORT_BATCH | APPROVER_EMPLOYEE_ID、REQUEST_EMPLOYEE_ID、IMPORT_EMPLOYEE_ID | 1 : 0..n | 図では省略 |
 
 ## 4. データモデルの要点
@@ -99,3 +107,10 @@ erDiagram
 
 - ステータス遷移マスタ（M_STATUS_TRANSITION）が遷移ルールを持ち、会社区分による分岐も事前確認区分で表す。アプリケーションは遷移をハードコードしない。
 - 会社区分マスタ（M_COMPANY_DIV）が外部事前確認の有無と変更基準のしきい値を持つ。
+- 部署マスタ（M_DEPARTMENT）は会社区分ごとの部署コードと部署名を持つ。社員の所属部署・承認ルートの部署・申込の担当部署はこのマスタから選ぶ。
+
+### 4.7 申込の担当（会社 > 部署 > 担当者）
+
+- 申込（T_APPLICATION）の会社区分・部署コード・担当社員ID が申込受付会社側の担当で、事前確認の有無と変更基準（会社区分）、承認ルートの初期値と承認者の参照範囲（会社区分・部署）、操作できる社員と通知先（担当社員）を決める。
+- 既定は入力した社員の会社区分・所属部署・本人。部署は担当者の所属部署と異なってよい。変更できるのは申込入力中（10101。全体修正後の再入力を含む）だけで、承認・同意・審査の途中では変わらない。
+- 申込内容（T_APPLICATION_VERSION）の各版にも同じ 3 項目を記録し、全体修正で担当を変えたときに複写元の版との差分（赤字）を表示する。版の 3 項目は記録のため外部キーを持たない。

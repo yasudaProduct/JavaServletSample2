@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| 版 | 0.5（新規申込は常に別の申込者、同じ申込者は追加申込でアカウントを引き継ぐ。版 0.4：申込者情報を D1 の版に持ち、ログイン用データを D8 に分離） |
+| 版 | 0.6（D1 に申込の担当（会社区分・部署・担当社員）を明記。版 0.5：新規申込は常に別の申込者、同じ申込者は追加申込でアカウントを引き継ぐ。版 0.4：申込者情報を D1 の版に持ち、ログイン用データを D8 に分離） |
 | 図の原本 | [dfd.drawio](../diagrams/dfd.drawio)（draw.io 形式。PNG は [diagrams/png/dfd.png](../diagrams/png/dfd.png)） |
 | 関連 | [09. 機能一覧](09-function-list.md)、[07. テーブル定義](07-table-definition.md) |
 
@@ -53,7 +53,7 @@ flowchart LR
 
 | 記号 | データストア | 対応するテーブル |
 | --- | --- | --- |
-| D1 | 申込・申込内容（版） | T_APPLICATION、T_APPLICATION_VERSION（申込者名・申込者名カナ・メールアドレス・電話番号・住所を版ごとに持つ） |
+| D1 | 申込・申込内容（版） | T_APPLICATION、T_APPLICATION_VERSION（申込者名・申込者名カナ・メールアドレス・電話番号・住所と、申込の担当（会社区分・部署・担当社員）を版ごとに持つ） |
 | D2 | 承認申請・承認明細 | T_APPROVAL_REQUEST、T_APPROVAL_STEP |
 | D3 | 申込者同意 | T_APPLICANT_CONSENT |
 | D4 | 外部連携 | T_EXTERNAL_LINK |
