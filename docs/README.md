@@ -9,14 +9,14 @@
 | No | ドキュメント | 内容 |
 | --- | --- | --- |
 | 01 | [システム概要](basic-design/01-overview.md) | 目的、対象範囲、アクター、会社区分、設計方針、用語 |
-| 02 | [システム構成・アプリケーション構成](basic-design/02-system-architecture.md) | システム構成（仮）、技術スタック（仮）、レイヤ構成、パッケージ構成案 |
-| 03 | [ステータス定義・状態遷移](basic-design/03-status-transition.md) | 23 ステータス（5 桁コード）、会社区分別の遷移ルール、フロー別の状態遷移図、遷移マスタ初期データ（55 行）、版と基準版 |
+| 02 | [システム構成・アプリケーション構成](basic-design/02-system-architecture.md) | システム構成、技術スタック（確定）、レイヤ構成、パッケージ構成 |
+| 03 | [ステータス定義・状態遷移](basic-design/03-status-transition.md) | 24 ステータス（5 桁コード。申込取消 90101 を含む）、会社区分別の遷移ルール、フロー別の状態遷移図、遷移マスタ初期データ（74 行。取消 19 行を含む）、版と基準版 |
 | 04 | [処理フロー図](basic-design/04-process-flow.md) | 新規申込／契約変更のスイムレーン図と工程表 |
 | 05 | [データフロー図](basic-design/05-data-flow.md) | コンテキスト図、レベル 1 DFD、処理・データストア・フロー一覧 |
 | 06 | [ER図](basic-design/06-er-diagram.md) | ER図、リレーション一覧、データモデルの要点 |
 | 07 | [テーブル定義](basic-design/07-table-definition.md) | 17 テーブルの項目定義、型対応表（SQL Server 想定）、インデックス |
 | 08 | [コード定義](basic-design/08-code-definition.md) | 区分値の一覧（操作コード、条件コード、承認種別 など） |
-| 09 | [機能一覧](basic-design/09-function-list.md) | F01〜F15、機能とステータスの対応、画面・IF・バッチの ID 体系 |
+| 09 | [機能一覧](basic-design/09-function-list.md) | F01〜F17、機能とステータスの対応、画面・IF・バッチの ID 体系 |
 | 10 | [機能詳細](basic-design/10-function-detail.md) | 各機能の処理手順、F14 ステータス遷移制御、主要シーケンス図 |
 | 11 | [画面設計](basic-design/11-screen-design.md) | 申込受付会社向け・申込者向けの画面一覧、画面遷移図、画面別の項目・操作・ボタン表示制御 |
 | 12 | [外部インターフェース設計](basic-design/12-external-interface.md) | 審査担当部門システムとの API（IF01〜IF04）、取込ファイル（IF05） |
@@ -30,7 +30,7 @@
 | --- | --- | --- |
 | [diagrams/process-flow-new-application.drawio](diagrams/process-flow-new-application.drawio) | 処理フロー図（1/2）新規申込フロー | 04 |
 | [diagrams/process-flow-contract-change.drawio](diagrams/process-flow-contract-change.drawio) | 処理フロー図（2/2）契約変更フロー | 04 |
-| [diagrams/status-transition.drawio](diagrams/status-transition.drawio) | ステータス遷移図（全 23 ステータス） | 03 |
+| [diagrams/status-transition.drawio](diagrams/status-transition.drawio) | ステータス遷移図（業務側の 23 ステータス。申込取消 90101 と取消の遷移は省略、03 の 6.5 節） | 03 |
 | [diagrams/dfd.drawio](diagrams/dfd.drawio) | データフロー図（レベル 1） | 05 |
 | [diagrams/er-diagram.drawio](diagrams/er-diagram.drawio) | ER図（17 テーブル） | 06 |
 | [diagrams/png/](diagrams/png/) | 上記の PNG エクスポート（閲覧用。原本は .drawio） | |
@@ -54,6 +54,7 @@
 | --- | --- | --- |
 | 0.1 | 2026-09-30 | 初版（4 桁ステータス、顧客・外部システムの用語） |
 | 0.2 | 2026-10-01 | 業務側のステータス一覧・会社区分別遷移表に合わせて全面改定（5 桁ステータス、申込受付会社・申込者・審査担当部門の用語、事前確認を同意後の工程に変更、申込者の修正・差戻し、審査差戻し、画面からの新規・追加申込、契約変更の複数回対応） |
+| 0.10 | 2026-10-04 | 設計書と実装の照合（ER 図・テーブル定義・ステータス・遷移マスタ・コード定義は一致を確認）。操作の起点・戻り先を申込メニュー（SC14）に統一し SC03 の旧ボタン表を削除、申込者ページ（`/my/`）の認証・ヘッダ・遷移、バッチ・メールの既定値、ログ、メッセージ一覧（E009 削除、E010・E110・E111 追加）、F07 のトークン判定順、マスタ画面の一覧・入力を実装に合わせる（02〜05、08〜14、99、README） |
 | 0.9 | 2026-10-04 | 新規申込は同じ氏名・メールアドレスでも別の申込者とし、申込者番号の指定・重複警告（W003）・取込の申込者番号列を廃止。同じ申込者は追加申込で作り、元の申込が審査完了（10701／20701）のときだけ可能（アカウントを引き継ぎ、申込者情報は複写した別データ）。05（DFD 図）、06、07、09〜12、14、99（No.18・55・56・62、D30、D32）、01 に反映 |
 | 0.8 | 2026-10-03 | 申込者名・カナ・電話番号・メールアドレス・住所を申込データ（申込内容の版）に移し、ログインに必要なデータを申込者アカウント（M_APPLICANT_ACCOUNT）に分離。アカウントは一次承認で発行して申込に紐づけ、2 件目以降は申込者番号の指定で紐づける。F18 と SC15 の申込者情報の変更を廃止。05（D1／D8、DFD 図）、06（ER 図）、07（V5）、09〜14、99（D29〜D31）、01 に反映 |
 | 0.7 | 2026-10-03 | 申込者データの起点を申込受付会社の新規申込に変更（SC04 で申込者を登録・採番、重複確認、補正、SC15 で変更、一括取込に申込者列）。05 データフロー（D8 申込者、申込者データの流れ）と DFD 図、01／07／09／10／11／12／14／99 に反映 |
@@ -64,7 +65,7 @@
 
 ## 実装との対応
 
-実装（`src/`）は本設計書に従う。起動方法と試し方は [README](../README.md) を参照。実装時に設計を補った点は [99. 未決事項](basic-design/99-open-issues.md) の決定事項（D12〜D14）に記録している。DDL は `src/main/resources/db/migration/V1__create_tables.sql`、遷移マスタ・ステータスマスタの初期データは `V2__initial_data.sql` にあり、[07. テーブル定義](basic-design/07-table-definition.md) と [03. 6 章](basic-design/03-status-transition.md#6-ステータス遷移マスタ-初期データ) を正とする。
+実装（`src/`）は本設計書に従う。起動方法と試し方は [README](../README.md) を参照。実装時に設計を補った点や指示による決定は [99. 未決事項](basic-design/99-open-issues.md) の決定事項（D12 以降）に記録している。DDL は `src/main/resources/db/migration/V1__create_tables.sql`、遷移マスタ・ステータスマスタの初期データは `V2__initial_data.sql` にあり、以降の変更は V3〜V5_3（DBMS 別のものは `db/vendor/`）にある。いずれも[07. テーブル定義](basic-design/07-table-definition.md) と [03. 6 章](basic-design/03-status-transition.md#6-ステータス遷移マスタ-初期データ) を正とする。
 
 ## 今後の予定
 

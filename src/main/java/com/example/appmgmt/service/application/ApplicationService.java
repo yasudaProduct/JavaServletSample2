@@ -185,8 +185,8 @@ public class ApplicationService {
                 if (amountsOnly) {
                     throw new BusinessException("E104");
                 }
-                // 変更なし：版を作らず再依頼（変更基準内として扱う）
-                return transitionService.transition(conn, TransitionRequest.of(applicationId, rowVersion, Codes.ACTION_CONFIRM, Codes.ACTOR_OWNER, actor(user)));
+                // 変更なし：版を作らず再依頼（変更基準内として扱う）。現行版に残っている変更金額倍率（基準超の修正で同意した版など）では判定しない
+                return transitionService.transition(conn, TransitionRequest.of(applicationId, rowVersion, Codes.ACTION_CONFIRM, Codes.ACTOR_OWNER, actor(user)).overLimit(false));
             }
             int newNo = maxVersionNo(conn, applicationId) + 1;
             ApplicationVersion v = merged;

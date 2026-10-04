@@ -41,7 +41,9 @@ public class ApplicationsServlet extends BaseServlet {
     @Override
     protected String fallbackPath(HttpServletRequest req) {
         List<String> parts = pathParts(req);
-        if (!parts.isEmpty() && parseId(parts.get(0)) != null) {
+        boolean menuItself = parts.size() == 2 && "menu".equals(parts.get(1)) && "GET".equals(req.getMethod());
+        // 申込メニュー自体を表示できない（参照範囲外・存在しない申込など）ときは一覧へ戻す（同じメニューへ戻すと無限リダイレクトになる）
+        if (!parts.isEmpty() && parseId(parts.get(0)) != null && !menuItself) {
             return "/emp/applications/" + parts.get(0) + "/menu";
         }
         return "/emp/applications";

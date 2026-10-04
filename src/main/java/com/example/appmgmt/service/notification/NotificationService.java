@@ -64,7 +64,8 @@ public class NotificationService {
         p.put("ownerMail", owner == null ? "" : owner.getMailAddress());
         p.put("applicantMail", applicant == null ? "" : applicant.getMailAddress());
         p.put("statusName", status == null ? app.getStatusCd() : status.getStatusName());
-        p.put("detailUrl", AppConfig.get().getString("app.employee-base-url") + "/emp/applications/" + app.getApplicationId());
+        // 社員向け通知の誘導先は申込メニュー（SC14）。SC03 は開発者向けの参照画面のため使わない
+        p.put("detailUrl", AppConfig.get().getString("app.employee-base-url") + "/emp/applications/" + app.getApplicationId() + "/menu");
         p.put("occurredAt", Formats.dateTime(LocalDateTime.now()));
         return p;
     }

@@ -13,6 +13,8 @@ public class TransitionRequest {
     private Long externalLinkId;
     private Boolean hasRoute;
     private String clientIp;
+    /** 変更基準（条件 21）の判定結果を呼出元が決める場合に設定する（null なら現行版の変更金額倍率で判定）。 */
+    private Boolean overLimit;
 
     public static TransitionRequest of(long applicationId, int expectedRowVersion, String actionCd, String actorType, String actorId) {
         TransitionRequest r = new TransitionRequest();
@@ -30,6 +32,7 @@ public class TransitionRequest {
     public TransitionRequest externalLinkId(Long id) { this.externalLinkId = id; return this; }
     public TransitionRequest hasRoute(Boolean hasRoute) { this.hasRoute = hasRoute; return this; }
     public TransitionRequest clientIp(String ip) { this.clientIp = ip; return this; }
+    public TransitionRequest overLimit(Boolean overLimit) { this.overLimit = overLimit; return this; }
 
     public long getApplicationId() { return applicationId; }
     public int getExpectedRowVersion() { return expectedRowVersion; }
@@ -42,4 +45,5 @@ public class TransitionRequest {
     public Long getExternalLinkId() { return externalLinkId; }
     public Boolean getHasRoute() { return hasRoute; }
     public String getClientIp() { return clientIp; }
+    public Boolean getOverLimit() { return overLimit; }
 }

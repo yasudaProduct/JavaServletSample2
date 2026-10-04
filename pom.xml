@@ -9,7 +9,7 @@
   <version>0.2.0-SNAPSHOT</version>
   <packaging>war</packaging>
   <name>申込管理システム</name>
-  <description>申込の取込・承認・申込者同意・審査・契約変更を 23 ステータスで管理する Servlet/JSP アプリケーション</description>
+  <description>申込の取込・承認・申込者同意・審査・契約変更を 24 ステータスで管理する Servlet/JSP アプリケーション</description>
 
   <properties>
     <maven.compiler.release>17</maven.compiler.release>

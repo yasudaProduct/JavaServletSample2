@@ -4,7 +4,7 @@
 
 ## 現在の状態
 
-- 基本設計：版 0.7（[docs/README.md](docs/README.md)）。業務ルールの未決事項は [99. 未決事項](docs/basic-design/99-open-issues.md) で管理している。
+- 基本設計：版 0.10（[docs/README.md](docs/README.md)）。業務ルールの未決事項は [99. 未決事項](docs/basic-design/99-open-issues.md) で管理している。
 - 実装：動作確認用のサンプル実装（版 0.2.0）。設計書の全画面（SC01〜SC15、AP01〜AP09）、外部 IF（IF01〜IF05）、バッチ（BT01／BT02）を実装し、Docker Compose で起動できる。申込に対する操作は申込メニュー（SC14）に集約し、申込全体の操作（契約変更・追加申込・メンテナンス）と手続きごとの領域（新規申込、契約変更 1、契約変更 2 …。折りたたみ可）に分けて表示する（タイルは固定で活性・非活性だけが変わる）。申込入力画面へは申込内容確認（SC05／SC09）の「修正」から進む。申込者は一次承認後に発行されるアカウントで申込者ページ（`/my/`）にログインできる。要件は変わる可能性があるため、業務ルールは設計書を正とし、実装はそれに追従させる。
 
 ## 技術スタック（確定）
@@ -131,7 +131,7 @@ mvn test               # 単体テストのみ（遷移条件、入力チェッ�
     │   ├── application.properties  設定の既定値
     │   ├── messages.properties     メッセージ一覧
     │   ├── notification-templates.properties  通知メールの文面
-    │   └── db/migration/           Flyway（V1 DDL、V2 初期データ）、db/vendor/{sqlserver,h2}
+    │   └── db/migration/           Flyway（V1 DDL、V2 初期データ、V3〜V5_2 の変更）、db/vendor/{sqlserver,h2}（DBMS 別の V1_1、V5_1、V5_3）
     ├── main/webapp/              web.xml、JSP（WEB-INF/views）、Bootstrap（static/vendor）
     └── test/java/                単体テストと LocalServer（組込み Tomcat 起動）
 ```
@@ -139,7 +139,7 @@ mvn test               # 単体テストのみ（遷移条件、入力チェッ�
 ## 設計書との対応と未実装事項
 
 - ステータス遷移はすべて `StatusTransitionService`（F14）を通り、遷移マスタ 74 行（取消 19 行を含む）・条件評価・操作主体の照合・後続処理を [10. 機能詳細](docs/basic-design/10-function-detail.md) のとおり実装している。
-- 未実装・簡略化：ログイン失敗回数によるロック（99 No.30）、通知の送信エラーを再送する画面（No.31）、承認ルートの適用期間の重なり警告、社員無効化時の警告（SC11）、申込者パスワードの再発行・ロック（No.49）。回付先と承認ルートマスタの明細は最大 5 ステップ。
+- 未実装・簡略化：ログイン失敗回数によるロック（99 No.30）、通知の送信エラーを再送する画面（No.31）、承認ルートの適用期間の重なり警告、社員無効化時の警告（SC11）、申込者自身によるパスワードの再発行（パスワードを忘れた場合）とロック（No.49。担当者・管理者による初期化は SC15 で実装済み）。回付先と承認ルートマスタの明細は最大 5 ステップ。
 - 審査担当部門システムの API 仕様は未入手のため、送信電文・受信電文は [12. 外部インターフェース設計](docs/basic-design/12-external-interface.md) の仮仕様で実装している。
 
 ## ドキュメント

@@ -40,6 +40,16 @@ class StatusTransitionServiceTest {
     }
 
     @Test
+    void explicitOverLimitDecisionIsUsedWithoutReadingTheVersion() {
+        // 修正対応（10402／20402）を変更なしで確定するときは、現行版に残っている倍率ではなく呼出元の判定（基準内）を使う
+        StatusTransitionService s = new StatusTransitionService(null, null, null, null, null, null, null, null, null, null, null);
+        TransitionRequest within = TransitionRequest.of(1L, 0, "02", "1", "1").overLimit(false);
+        TransitionRequest over = TransitionRequest.of(1L, 0, "02", "1", "1").overLimit(true);
+        assertFalse(s.evaluate(null, "21", null, null, within));
+        assertTrue(s.evaluate(null, "21", null, null, over));
+    }
+
+    @Test
     void nullRatioIsWithin() {
         assertFalse(StatusTransitionService.isOverLimit(null, LIMIT));
     }

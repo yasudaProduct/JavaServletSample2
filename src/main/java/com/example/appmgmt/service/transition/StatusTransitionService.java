@@ -138,6 +138,9 @@ public class StatusTransitionService {
             case Codes.COND_ROUTE_NONE:
                 return Boolean.FALSE.equals(req.getHasRoute());
             case Codes.COND_OVER_LIMIT: {
+                if (req.getOverLimit() != null) {
+                    return req.getOverLimit();
+                }
                 ApplicationVersion current = versionDao.get(conn, app.getApplicationId(), app.getCurrentVersionNo());
                 return isOverLimit(current.getAmountRatio(), div.getAmountRatioLimit());
             }
